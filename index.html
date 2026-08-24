@@ -275,6 +275,18 @@
             border: 1px solid #64748b;
         }
 
+
+        .history-btn { background:#0f766e; }
+        .signature-btn { background:#8b5cf6; }
+        .proof-action-btn { background:#7c3aed; }
+        .history-grid { display:grid; grid-template-columns:1fr; gap:8px; max-height:60vh; overflow:auto; }
+        .history-card { background:#0f172a; border:1px solid #334155; border-radius:10px; padding:10px; }
+        .history-proof { width:100%; max-height:220px; object-fit:contain; border-radius:8px; margin-top:7px; background:#fff; }
+        .signature-preview { width:100%; max-height:120px; object-fit:contain; background:#fff; border-radius:8px; margin-top:7px; }
+        .signature-pad { width:100%; height:220px; background:#fff; border:2px solid #475569; border-radius:10px; touch-action:none; display:block; }
+        .history-meta { color:#94a3b8; font-size:11px; line-height:1.7; }
+        .proof-status { color:#86efac; font-size:11px; }
+
         .empty {
             text-align: center;
             color: #64748b;
@@ -571,6 +583,14 @@
         </button>
 
 
+        <button
+            class="action-main-btn history-btn"
+            onclick="openDeliveryHistory()"
+        >
+            🕘 History — الطرود المستلمة
+        </button>
+
+
         <div
             id="loading"
             class="loading"
@@ -646,6 +666,52 @@
 
     </div>
 
+
+    <!-- Modal سجل التسليم -->
+    <div id="historyModal" class="modal">
+        <div class="modal-content">
+            <h3>🕘 سجل الطرود المستلمة</h3>
+            <div id="historyList" class="history-grid"></div>
+            <div class="modal-buttons">
+                <button class="modal-btn close-btn" onclick="closeDeliveryHistory()">إغلاق</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal توقيع المستلم -->
+    <div id="signatureModal" class="modal">
+        <div class="modal-content">
+            <h3>✍️ توقيع المستلم</h3>
+            <p id="signatureParcelLabel" style="font-size:12px;color:#94a3b8;"></p>
+            <canvas id="signaturePad" class="signature-pad"></canvas>
+            <div class="btn-group" style="margin-top:8px;">
+                <button class="action-btn edit-btn" onclick="clearSignaturePad()">🧹 مسح</button>
+                <button class="action-btn signature-btn" onclick="saveSignature()">💾 حفظ التوقيع</button>
+            </div>
+            <div class="modal-buttons">
+                <button class="modal-btn close-btn" onclick="closeSignatureModal()">إلغاء</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal تأكيد التسليم -->
+    <div id="deliveryProofModal" class="modal">
+        <div class="modal-content">
+            <h3>✅ تأكيد التسليم</h3>
+            <p id="deliveryProofLabel" style="font-size:12px;color:#94a3b8;"></p>
+            <div class="btn-group">
+                <button class="action-btn wa-btn" onclick="sendDeliveryWhatsApp(currentDeliveryIndex)">🟢 WhatsApp</button>
+                <button class="action-btn proof-action-btn" onclick="takeProof(currentDeliveryIndex); closeDeliveryProofModal();">📸 صورة التسليم</button>
+                <button class="action-btn signature-btn" onclick="openSignature(currentDeliveryIndex); closeDeliveryProofModal();">✍️ توقيع المستلم</button>
+            </div>
+            <div class="btn-group" style="margin-top:8px;">
+                <button class="action-btn deliver-btn" onclick="completeDelivery(currentDeliveryIndex, true)">💾 تأكيد وحفظ</button>
+            </div>
+            <div class="modal-buttons">
+                <button class="modal-btn close-btn" onclick="closeDeliveryProofModal()">إغلاق</button>
+            </div>
+        </div>
+    </div>
 
     <!-- Modal إضافة/تعديل طرد -->
 
@@ -917,9 +983,6 @@ initAI();
 const AI_BACKEND_URL =
     "https://pro-delivery-ai.yasserkhalil.workers.dev";
 
-// AI provider: Google Gemini via Cloudflare Worker.
-// Never put GEMINI_API_KEY in this file.
-
 
 function initAI() {
 
@@ -965,7 +1028,7 @@ function initAI() {
             button.disabled = true;
 
             button.innerText =
-                "🤖 جاري تحليل العنوان بـGemini...";
+                "🤖 جاري تحليل الورقة...";
 
 
             try {
@@ -1004,7 +1067,7 @@ function initAI() {
                     false;
 
                 button.innerText =
-                    "🤖 📷 قراءة العنوان بالـGemini";
+                    "🤖 📷 قراءة العنوان بالـAI";
             }
 
         }
@@ -1088,7 +1151,6 @@ async function analyzeAddressWithAI(
                 await response.json();
 
             message =
-                data.details ||
                 data.error ||
                 message;
 
@@ -1107,7 +1169,6 @@ async function analyzeAddressWithAI(
     if (!data.success) {
 
         throw new Error(
-            data.details ||
             data.error ||
             "فشل تحليل الصورة."
         );
@@ -1250,6 +1311,31 @@ function saveParcelForm() {
         proofUrl:
             index !== ""
                 ? parcels[index].proofUrl
+                : null,
+
+        proofTakenAt:
+            index !== ""
+                ? parcels[index].proofTakenAt
+                : null,
+
+        signatureUrl:
+            index !== ""
+                ? parcels[index].signatureUrl
+                : null,
+
+        signatureAt:
+            index !== ""
+                ? parcels[index].signatureAt
+                : null,
+
+        deliveredAt:
+            index !== ""
+                ? parcels[index].deliveredAt
+                : null,
+
+        whatsappPreparedAt:
+            index !== ""
+                ? parcels[index].whatsappPreparedAt
                 : null
     };
 
@@ -2411,20 +2497,158 @@ function updateUI() {
    DELIVERED
 ===================================================== */
 
-function markDelivered(
-    index
-) {
-
-    parcels[index].status =
-        "delivered";
-
-
-    parcels[index].deliveredAt =
-        new Date()
-            .toISOString();
-
-
+function markDelivered(index) {
+    currentDeliveryIndex = index;
+    const parcel = parcels[index];
+    parcel.status = "delivered";
+    parcel.deliveredAt = parcel.deliveredAt || new Date().toISOString();
     saveAndSync();
+
+    const label = document.getElementById("deliveryProofLabel");
+    if (label) label.textContent = `${parcel.name || "مستلم"} — ${getAddress(parcel)}`;
+    document.getElementById("deliveryProofModal").classList.add("show");
+}
+
+function completeDelivery(index, sendWhatsApp = true) {
+    if (index == null || !parcels[index]) return;
+    const parcel = parcels[index];
+    parcel.status = "delivered";
+    parcel.deliveredAt = parcel.deliveredAt || new Date().toISOString();
+    parcel.confirmedAt = new Date().toISOString();
+    saveAndSync();
+    closeDeliveryProofModal();
+    if (sendWhatsApp && parcel.phone) sendDeliveryWhatsApp(index);
+    updateUI();
+}
+
+function closeDeliveryProofModal() {
+    document.getElementById("deliveryProofModal").classList.remove("show");
+}
+
+function normalizeGermanPhone(phone) {
+    let p = String(phone || "").trim().replace(/[^0-9+]/g, "");
+    if (p.startsWith("00")) p = "+" + p.slice(2);
+    if (p.startsWith("0")) p = "+49" + p.slice(1);
+    if (p.startsWith("49")) p = "+" + p;
+    return p;
+}
+
+function sendDeliveryWhatsApp(index) {
+    const parcel = parcels[index];
+    if (!parcel) return;
+    const phone = normalizeGermanPhone(parcel.phone);
+    if (!phone) {
+        alert("لا يوجد رقم هاتف لهذا الطرد.");
+        return;
+    }
+    const address = getAddress(parcel);
+    const time = parcel.deliveredAt ? new Date(parcel.deliveredAt).toLocaleString("de-DE") : new Date().toLocaleString("de-DE");
+    const text = `Hallo ${parcel.name || ""},
+
+Ihr Paket wurde erfolgreich zugestellt.
+📦 ${parcel.barcode || ""}
+📍 ${address}
+🕒 ${time}
+
+Vielen Dank!`;
+    const url = `https://wa.me/${phone.replace(/\D/g, "")}?text=${encodeURIComponent(text)}`;
+    parcel.whatsappPreparedAt = new Date().toISOString();
+    saveAndSync();
+    window.open(url, "_blank");
+}
+
+function openDeliveryHistory() {
+    const list = document.getElementById("historyList");
+    const delivered = parcels.filter(p => p.status === "delivered").sort((a,b) => new Date(b.deliveredAt || 0) - new Date(a.deliveredAt || 0));
+    if (!delivered.length) {
+        list.innerHTML = '<div class="empty">لا توجد طرود مستلمة بعد.</div>';
+    } else {
+        list.innerHTML = delivered.map(parcel => {
+            const index = parcels.indexOf(parcel);
+            const date = parcel.deliveredAt ? new Date(parcel.deliveredAt).toLocaleString("de-DE") : "غير مسجل";
+            return `<div class="history-card">
+                <strong>📦 ${escapeHTML(parcel.name || "بدون اسم")}</strong>
+                <div class="history-meta">📍 ${escapeHTML(getAddress(parcel))}<br>📞 ${escapeHTML(parcel.phone || "بدون هاتف")}<br>🕒 ${escapeHTML(date)}<br>🔳 ${escapeHTML(parcel.barcode || "بدون Barcode")}</div>
+                ${parcel.proofUrl ? `<img class="history-proof" src="${parcel.proofUrl}" alt="Proof of delivery">` : '<div class="history-meta">📸 لا توجد صورة تسليم</div>'}
+                ${parcel.signatureUrl ? `<img class="signature-preview" src="${parcel.signatureUrl}" alt="Signature">` : '<div class="history-meta">✍️ لا يوجد توقيع</div>'}
+                <div class="proof-status">${parcel.whatsappPreparedAt ? "🟢 رسالة WhatsApp جاهزة" : "⚪ لم يتم فتح رسالة WhatsApp"}</div>
+                <div class="btn-group" style="margin-top:7px;">
+                    ${parcel.phone ? `<button class="action-btn wa-btn" onclick="sendDeliveryWhatsApp(${index})">🟢 إرسال WhatsApp</button>` : ""}
+                    <button class="action-btn proof-action-btn" onclick="takeProof(${index})">📸 صورة</button>
+                    <button class="action-btn signature-btn" onclick="openSignature(${index})">✍️ توقيع</button>
+                </div>
+            </div>`;
+        }).join("");
+    }
+    document.getElementById("historyModal").classList.add("show");
+}
+
+function closeDeliveryHistory() {
+    document.getElementById("historyModal").classList.remove("show");
+}
+
+let currentDeliveryIndex = null;
+let signatureIndex = null;
+let signatureDrawing = false;
+let signatureCtx = null;
+
+function openSignature(index) {
+    signatureIndex = index;
+    const parcel = parcels[index];
+    document.getElementById("signatureParcelLabel").textContent = `${parcel.name || "المستلم"} — ${getAddress(parcel)}`;
+    document.getElementById("signatureModal").classList.add("show");
+    setTimeout(() => setupSignaturePad(parcel.signatureUrl), 50);
+}
+
+function setupSignaturePad(existing) {
+    const canvas = document.getElementById("signaturePad");
+    const rect = canvas.getBoundingClientRect();
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width = Math.max(1, Math.floor(rect.width * dpr));
+    canvas.height = Math.max(1, Math.floor(rect.height * dpr));
+    signatureCtx = canvas.getContext("2d");
+    signatureCtx.scale(dpr, dpr);
+    signatureCtx.lineWidth = 2.5;
+    signatureCtx.lineCap = "round";
+    signatureCtx.strokeStyle = "#111827";
+    if (existing) {
+        const img = new Image();
+        img.onload = () => signatureCtx.drawImage(img, 0, 0, rect.width, rect.height);
+        img.src = existing;
+    }
+    const point = e => {
+        const r = canvas.getBoundingClientRect();
+        return { x: e.clientX - r.left, y: e.clientY - r.top };
+    };
+    canvas.onpointerdown = e => { signatureDrawing = true; canvas.setPointerCapture(e.pointerId); const p = point(e); signatureCtx.beginPath(); signatureCtx.moveTo(p.x,p.y); };
+    canvas.onpointermove = e => { if (!signatureDrawing) return; const p = point(e); signatureCtx.lineTo(p.x,p.y); signatureCtx.stroke(); };
+    canvas.onpointerup = () => signatureDrawing = false;
+    canvas.onpointercancel = () => signatureDrawing = false;
+}
+
+function clearSignaturePad() {
+    const canvas = document.getElementById("signaturePad");
+    if (!signatureCtx) return;
+    const r = canvas.getBoundingClientRect();
+    signatureCtx.clearRect(0, 0, r.width, r.height);
+}
+
+function saveSignature() {
+    if (signatureIndex == null || !parcels[signatureIndex]) return;
+    const canvas = document.getElementById("signaturePad");
+    const data = canvas.toDataURL("image/png");
+    parcels[signatureIndex].signatureUrl = data;
+    parcels[signatureIndex].signatureAt = new Date().toISOString();
+    parcels[signatureIndex].status = "delivered";
+    parcels[signatureIndex].deliveredAt = parcels[signatureIndex].deliveredAt || new Date().toISOString();
+    saveAndSync();
+    closeSignatureModal();
+    alert("تم حفظ توقيع المستلم.");
+}
+
+function closeSignatureModal() {
+    document.getElementById("signatureModal").classList.remove("show");
+    signatureIndex = null;
 }
 
 
@@ -2552,70 +2776,37 @@ function editParcel(
    PROOF OF DELIVERY
 ===================================================== */
 
-function takeProof(
-    index
-) {
-
-    const input =
-        document.createElement(
-            "input"
-        );
-
-
-    input.type =
-        "file";
-
-    input.accept =
-        "image/*";
-
-    input.capture =
-        "environment";
-
-
-    input.onchange =
-        event => {
-
-            const file =
-                event.target.files?.[0];
-
-
-            if (!file)
-                return;
-
-
-            const reader =
-                new FileReader();
-
-
-            reader.onload =
-                function(event) {
-
-                    parcels[index]
-                        .proofUrl =
-                        event.target.result;
-
-
-                    parcels[index]
-                        .status =
-                        "delivered";
-
-
-                    parcels[index]
-                        .deliveredAt =
-                        new Date()
-                            .toISOString();
-
-
-                    saveAndSync();
-                };
-
-
-            reader.readAsDataURL(
-                file
-            );
+function takeProof(index) {
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = "image/*";
+    input.capture = "environment";
+    input.onchange = event => {
+        const file = event.target.files?.[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = function(event) {
+            const img = new Image();
+            img.onload = function() {
+                const max = 1400;
+                const scale = Math.min(1, max / Math.max(img.width, img.height));
+                const canvas = document.createElement("canvas");
+                canvas.width = Math.round(img.width * scale);
+                canvas.height = Math.round(img.height * scale);
+                const ctx = canvas.getContext("2d");
+                ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                parcels[index].proofUrl = canvas.toDataURL("image/jpeg", 0.78);
+                parcels[index].proofTakenAt = new Date().toISOString();
+                parcels[index].status = "delivered";
+                parcels[index].deliveredAt = parcels[index].deliveredAt || new Date().toISOString();
+                saveAndSync();
+                updateUI();
+                alert("تم حفظ صورة التسليم.");
+            };
+            img.src = event.target.result;
         };
-
-
+        reader.readAsDataURL(file);
+    };
     input.click();
 }
 
