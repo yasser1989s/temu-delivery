@@ -1926,6 +1926,8 @@ function openParcelForm(
 
 
 function saveParcelForm() {
+    normalizeParcelFormFields();
+
 
     const index =
         document.getElementById(
@@ -3632,6 +3634,39 @@ function formatRouteDistance(km) {
     if (!Number.isFinite(km) || km < 0) return "—";
     if (km < 1) return `${Math.round(km * 1000)} م`;
     return `${formatRouteDistance(km)}`;
+}
+
+
+function cleanPastedText(value) {
+    if (value == null) return "";
+    return String(value)
+        .replace(/\uFEFF/g, "")
+        .replace(/\u200B|\u200C|\u200D/g, "")
+        .replace(/\r\n?/g, "\n")
+        .replace(/[ \t]+/g, " ")
+        .trim();
+}
+
+function setInputValueSafe(id, value) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.value = cleanPastedText(value);
+    el.dispatchEvent(new Event("input", { bubbles: true }));
+    el.dispatchEvent(new Event("change", { bubbles: true }));
+}
+
+
+function normalizeParcelFormFields() {
+    const ids = [
+        "name", "address", "street", "houseNumber", "postalCode",
+        "city", "phone", "trackingNumber", "notes"
+    ];
+    ids.forEach(id => {
+        const el = document.getElementById(id);
+        if (el && typeof el.value === "string") {
+            el.value = cleanPastedText(el.value);
+        }
+    });
 }
 
 </script>
