@@ -406,6 +406,20 @@
             margin-bottom: 8px;
         }
 
+
+        .batch-btn { background:linear-gradient(135deg,#f59e0b,#ea580c); }
+        .batch-panel { background:#0f172a; border:1px solid #475569; border-radius:10px; padding:10px; margin-bottom:8px; }
+        .batch-progress { height:9px; background:#334155; border-radius:99px; overflow:hidden; margin:7px 0; }
+        .batch-progress > div { height:100%; width:0%; background:#22c55e; transition:width .25s; }
+        .route-card { background:#0f172a; border:1px solid #334155; border-radius:9px; padding:9px; margin-bottom:7px; }
+        .route-card.current { border-color:#22c55e; box-shadow:0 0 0 1px #22c55e55; }
+        .route-num { display:inline-flex; width:28px; height:28px; align-items:center; justify-content:center; border-radius:50%; background:#2563eb; font-weight:bold; margin-left:6px; }
+        .route-distance { color:#38bdf8; font-weight:bold; }
+        .route-time { color:#fbbf24; }
+        .batch-small { font-size:11px; color:#94a3b8; line-height:1.7; }
+        .batch-preview { display:grid; grid-template-columns:repeat(4,1fr); gap:5px; max-height:170px; overflow:auto; }
+        .batch-preview img { width:100%; aspect-ratio:1; object-fit:cover; border-radius:6px; border:1px solid #475569; background:#fff; }
+
         .next-stop {
             background: #172554;
             border: 1px solid #2563eb;
@@ -562,6 +576,22 @@
         </button>
 
 
+
+        <button
+            class="action-main-btn batch-btn"
+            onclick="openBatchScanner()"
+        >
+            📸  تصوير مجموعة الطرود — Batch Scan
+        </button>
+
+        <input
+            id="batchCameraInput"
+            type="file"
+            accept="image/*"
+            capture="environment"
+            hidden
+        >
+
         <!-- Optimize -->
 
         <button
@@ -666,6 +696,43 @@
 
     </div>
 
+
+
+    <!-- Batch Scan Modal -->
+    <div id="batchModal" class="modal">
+        <div class="modal-content">
+            <h3>📸 Batch Scan — تصوير مجموعة الطرود</h3>
+            <div class="batch-panel">
+                <div id="batchStatus">جاهز لتصوير أول طرد.</div>
+                <div class="batch-progress"><div id="batchProgressBar"></div></div>
+                <div class="batch-small" id="batchCounter">0 صورة</div>
+            </div>
+            <div class="batch-preview" id="batchPreview"></div>
+            <div class="btn-group" style="margin-top:8px;">
+                <button class="action-btn proof-action-btn" onclick="captureBatchParcel()">📷 تصوير طرد</button>
+                <button class="action-btn deliver-btn" onclick="processBatchScans()">🤖 تحليل الكل</button>
+                <button class="action-btn edit-btn" onclick="clearBatchScans()">🧹 مسح</button>
+            </div>
+            <div id="batchResults" style="margin-top:8px;"></div>
+            <div class="btn-group" style="margin-top:8px;">
+                <button class="action-btn" style="background:#2563eb;" onclick="buildBatchRoute()">🚀 ترتيب المسار</button>
+                <button class="action-btn close-btn" onclick="closeBatchScanner()">إغلاق</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Route Modal -->
+    <div id="routeModal" class="modal">
+        <div class="modal-content">
+            <h3>🚀 ترتيب التسليم</h3>
+            <div id="routeSummary" class="batch-panel"></div>
+            <div id="routeList"></div>
+            <div class="btn-group" style="margin-top:8px;">
+                <button class="action-btn deliver-btn" onclick="showNextStop()">📍 الطرد التالي</button>
+                <button class="action-btn close-btn" onclick="closeRouteModal()">إغلاق</button>
+            </div>
+        </div>
+    </div>
 
     <!-- Modal سجل التسليم -->
     <div id="historyModal" class="modal">
@@ -1870,146 +1937,140 @@ function startVoiceInput() {
    BARCODE / QR
 ===================================================== */
 
+let zxingLoaded = false;
+let zxingLoading = null;
+
+async function loadZXing() {
+    if (zxingLoaded && window.ZXingBrowser) return;
+    if (zxingLoading) return zxingLoading;
+
+    zxingLoading = new Promise((resolve, reject) => {
+        const existing = document.querySelector('script[data-zxing-browser]');
+        if (existing) {
+            existing.addEventListener('load', () => {
+                zxingLoaded = !!window.ZXingBrowser;
+                zxingLoaded ? resolve() : reject(new Error('ZXing لم يتم تحميله'));
+            }, { once: true });
+            existing.addEventListener('error', () => reject(new Error('تعذر تحميل مكتبة قراءة Barcode/QR')), { once: true });
+            return;
+        }
+
+        const script = document.createElement('script');
+        script.src = 'https://cdn.jsdelivr.net/npm/@zxing/browser@0.1.5/umd/index.min.js';
+        script.async = true;
+        script.dataset.zxingBrowser = '1';
+        script.onload = () => {
+            zxingLoaded = !!window.ZXingBrowser;
+            zxingLoaded ? resolve() : reject(new Error('ZXing لم يتم تحميله'));
+        };
+        script.onerror = () => reject(new Error('تعذر تحميل مكتبة قراءة Barcode/QR'));
+        document.head.appendChild(script);
+    });
+
+    return zxingLoading;
+}
+
+function closeBarcodeScanner(video, stream, controls, overlay) {
+    try {
+        if (controls && typeof controls.stop === 'function') controls.stop();
+    } catch {}
+    try {
+        if (stream) stream.getTracks().forEach(track => track.stop());
+    } catch {}
+    try {
+        if (video) video.remove();
+        if (overlay) overlay.remove();
+    } catch {}
+}
+
 async function scanBarcode() {
-
-    if (
-        !("BarcodeDetector" in window)
-    ) {
-
-        alert(
-            "BarcodeDetector غير مدعوم في هذا المتصفح. استخدم Chrome حديث."
-        );
-
-        return;
-    }
-
+    let overlay = null;
+    let video = null;
+    let controls = null;
+    let stream = null;
 
     try {
+        await loadZXing();
 
-        const stream =
-            await navigator
-                .mediaDevices
-                .getUserMedia({
-                    video: {
-                        facingMode:
-                            "environment"
-                    }
+        if (!navigator.mediaDevices?.getUserMedia) {
+            throw new Error('هذا المتصفح لا يسمح بالوصول إلى الكاميرا. افتح الموقع عبر HTTPS.');
+        }
+
+        overlay = document.createElement('div');
+        overlay.style.cssText = `
+            position:fixed; inset:0; z-index:10000;
+            background:#000; display:flex; flex-direction:column;
+            align-items:center; justify-content:center;
+        `;
+
+        video = document.createElement('video');
+        video.setAttribute('playsinline', 'true');
+        video.autoplay = true;
+        video.muted = true;
+        video.style.cssText = `
+            width:100%; height:100%; object-fit:cover;
+        `;
+
+        const closeBtn = document.createElement('button');
+        closeBtn.textContent = '✕ إغلاق';
+        closeBtn.style.cssText = `
+            position:absolute; top:24px; right:18px; z-index:2;
+            border:0; border-radius:14px; padding:12px 18px;
+            background:rgba(0,0,0,.65); color:#fff; font-size:18px;
+        `;
+
+        const hint = document.createElement('div');
+        hint.textContent = 'وجّه الكاميرا نحو Barcode أو QR';
+        hint.style.cssText = `
+            position:absolute; bottom:30px; left:18px; right:18px;
+            z-index:2; text-align:center; color:#fff;
+            background:rgba(0,0,0,.65); border-radius:14px;
+            padding:14px; font-size:17px;
+        `;
+
+        overlay.appendChild(video);
+        overlay.appendChild(closeBtn);
+        overlay.appendChild(hint);
+        document.body.appendChild(overlay);
+
+        closeBtn.onclick = () => closeBarcodeScanner(video, stream, controls, overlay);
+
+        const Reader = window.ZXingBrowser?.BrowserMultiFormatReader;
+        if (!Reader) throw new Error('قارئ Barcode/QR غير متاح.');
+
+        const reader = new Reader();
+
+        controls = await reader.decodeFromConstraints(
+            {
+                video: {
+                    facingMode: { ideal: 'environment' },
+                    width: { ideal: 1280 },
+                    height: { ideal: 720 }
+                },
+                audio: false
+            },
+            video,
+            (result, error) => {
+                if (!result) return;
+
+                const value = result.getText?.() || result.text || '';
+                if (!value) return;
+
+                closeBarcodeScanner(video, stream, controls, overlay);
+
+                openParcelForm({
+                    barcode: value,
+                    raw_text: value
                 });
-
-
-        const video =
-            document.createElement(
-                "video"
-            );
-
-
-        video.style.position =
-            "fixed";
-
-        video.style.inset =
-            "0";
-
-        video.style.width =
-            "100%";
-
-        video.style.height =
-            "100%";
-
-        video.style.objectFit =
-            "cover";
-
-        video.style.zIndex =
-            "9999";
-
-        video.autoplay =
-            true;
-
-        video.playsInline =
-            true;
-
-        document.body.appendChild(
-            video
+            }
         );
 
+        // ZXing owns the stream. Keep a reference when available.
+        stream = video.srcObject || null;
 
-        video.srcObject =
-            stream;
-
-
-        const detector =
-            new BarcodeDetector({
-                formats: [
-                    "qr_code",
-                    "code_128",
-                    "ean_13",
-                    "ean_8",
-                    "pdf417",
-                    "data_matrix",
-                    "aztec",
-                    "upc_a",
-                    "upc_e"
-                ]
-            });
-
-
-        const scan =
-            async () => {
-
-                try {
-
-                    const codes =
-                        await detector.detect(
-                            video
-                        );
-
-
-                    if (
-                        codes.length
-                    ) {
-
-                        const value =
-                            codes[0]
-                                .rawValue;
-
-
-                        stream
-                            .getTracks()
-                            .forEach(
-                                track =>
-                                    track.stop()
-                            );
-
-
-                        video.remove();
-
-
-                        openParcelForm({
-                            barcode:
-                                value
-                        });
-
-
-                        return;
-                    }
-
-                } catch {}
-
-
-                requestAnimationFrame(
-                    scan
-                );
-            };
-
-
-        scan();
-
-
-    } catch(error) {
-
-        alert(
-            "تعذر فتح الكاميرا: " +
-            error.message
-        );
+    } catch (error) {
+        closeBarcodeScanner(video, stream, controls, overlay);
+        alert('تعذر تشغيل قارئ Barcode / QR:\n\n' + (error?.message || error));
     }
 }
 
@@ -2815,7 +2876,10 @@ function takeProof(index) {
    ROUTE
 ===================================================== */
 
-function optimizeRoute() {
+async function optimizeRoute() {
+    if (BATCH_GEOCODE_BACKEND_URL && navigator.onLine) {
+        await geocodeMissingParcels();
+    }
 
     if (
         !parcels.length
@@ -2933,6 +2997,328 @@ function optimizeRoute() {
     `;
 }
 
+
+
+/* =====================================================
+   BATCH SCAN + ROUTE PLANNER
+===================================================== */
+
+let batchScans = [];
+let batchRoute = [];
+let batchRouteIndex = 0;
+const BATCH_GEOCODE_BACKEND_URL = "https://pro-delivery-ai.yasserkhalil.workers.dev/geocode";
+
+function openBatchScanner() {
+    document.getElementById("batchModal").classList.add("show");
+    renderBatchPreview();
+}
+
+function closeBatchScanner() {
+    document.getElementById("batchModal").classList.remove("show");
+}
+
+function clearBatchScans() {
+    if (batchScans.length && !confirm("حذف صور Batch الحالية؟")) return;
+    batchScans = [];
+    batchRoute = [];
+    batchRouteIndex = 0;
+    renderBatchPreview();
+    document.getElementById("batchResults").innerHTML = "";
+}
+
+function captureBatchParcel() {
+    const input = document.getElementById("batchCameraInput");
+    input.value = "";
+    input.onchange = async () => {
+        const file = input.files?.[0];
+        if (!file) return;
+        try {
+            const compressed = await compressImageForBatch(file);
+            batchScans.push({ image: compressed, status: "queued" });
+            renderBatchPreview();
+            document.getElementById("batchStatus").textContent = `تم تصوير الطرد ${batchScans.length}. صوّر التالي أو اضغط تحليل الكل.`;
+        } catch (e) {
+            alert("تعذر حفظ صورة الطرد: " + e.message);
+        }
+    };
+    input.click();
+}
+
+function compressImageForBatch(file) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onerror = () => reject(new Error("تعذر قراءة الصورة"));
+        reader.onload = () => {
+            const img = new Image();
+            img.onerror = () => reject(new Error("الصورة غير صالحة"));
+            img.onload = () => {
+                const max = 1280;
+                const scale = Math.min(1, max / Math.max(img.width, img.height));
+                const canvas = document.createElement("canvas");
+                canvas.width = Math.max(1, Math.round(img.width * scale));
+                canvas.height = Math.max(1, Math.round(img.height * scale));
+                const ctx = canvas.getContext("2d", {alpha:false});
+                ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                resolve(canvas.toDataURL("image/jpeg", 0.68));
+            };
+            img.src = reader.result;
+        };
+        reader.readAsDataURL(file);
+    });
+}
+
+function renderBatchPreview() {
+    const preview = document.getElementById("batchPreview");
+    preview.innerHTML = batchScans.map((x,i) => `<div title="${x.status}"><img src="${x.image}" alt="${i+1}"></div>`).join("");
+    document.getElementById("batchCounter").textContent = `${batchScans.length} صورة`;
+    document.getElementById("batchProgressBar").style.width = Math.min(100, batchScans.length) + "%";
+}
+
+async function processBatchScans() {
+    if (!batchScans.length) { alert("صوّر طردًا واحدًا على الأقل أولًا."); return; }
+    const results = document.getElementById("batchResults");
+    results.innerHTML = "";
+    let completed = 0;
+    document.getElementById("batchStatus").textContent = `🤖 جاري تحليل 0 / ${batchScans.length}`;
+
+    // حدّ أقصى طلبين بالتوازي لتقليل الضغط على Gemini.
+    let cursor = 0;
+    async function worker() {
+        while (cursor < batchScans.length) {
+            const i = cursor++;
+            try {
+                const data = await analyzeAddressWithAI(batchScans[i].image);
+                batchScans[i].data = data || {};
+                batchScans[i].status = "done";
+            } catch (e) {
+                batchScans[i].status = "error";
+                batchScans[i].error = e.message;
+            }
+            completed++;
+            document.getElementById("batchStatus").textContent = `🤖 جاري تحليل ${completed} / ${batchScans.length}`;
+            document.getElementById("batchProgressBar").style.width = Math.round(completed / batchScans.length * 100) + "%";
+            renderBatchResults();
+        }
+    }
+    await Promise.all([worker(), worker()]);
+    renderBatchResults();
+    document.getElementById("batchStatus").textContent = `✅ انتهى التحليل: ${batchScans.filter(x=>x.status==='done').length} / ${batchScans.length}`;
+}
+
+function renderBatchResults() {
+    const el = document.getElementById("batchResults");
+    el.innerHTML = batchScans.map((x,i) => {
+        if (x.status === "error") return `<div class="route-card">🔴 #${i+1} فشل: ${escapeHTML(x.error || "خطأ")}</div>`;
+        if (x.status !== "done") return `<div class="route-card">⏳ #${i+1} قيد التحليل...</div>`;
+        const d = x.data || {};
+        const addr = [d.street && ((d.street||"") + (d.house ? " " + d.house : "")), [d.zip,d.city].filter(Boolean).join(" ")].filter(Boolean).join(", ");
+        return `<div class="route-card">🟢 #${i+1} <b>${escapeHTML(d.name || "بدون اسم")}</b><br><span class="batch-small">${escapeHTML(addr || d.raw_text || "عنوان غير واضح")}</span></div>`;
+    }).join("");
+}
+
+async function buildBatchRoute() {
+    const done = batchScans.filter(x => x.status === "done" && x.data);
+    if (!done.length) { alert("حلّل الصور أولًا."); return; }
+    if (lastLat === null || lastLon === null) {
+        alert("اسمح للموقع بالوصول إلى GPS أولًا، ثم أعد ترتيب المسار.");
+        return;
+    }
+
+    // أضف الطرود الجديدة مرة واحدة، مع منع تكرار Barcode واضح.
+    let added = 0;
+    for (const x of done) {
+        const d = x.data;
+        const barcode = String(d.barcode || "").trim();
+        const duplicate = barcode && parcels.some(p => String(p.barcode || "").trim() === barcode);
+        if (duplicate) continue;
+        parcels.push({
+            id: Date.now() + Math.random(), name:d.name||"", street:d.street||"", house:d.house||"", zip:d.zip||"", city:d.city||"", phone:d.phone||"", barcode, notes:d.raw_text||"", status:"pending", proofUrl:null, proofTakenAt:null, signatureUrl:null, signatureAt:null, deliveredAt:null, whatsappPreparedAt:null, lat:Number.isFinite(+d.lat)?+d.lat:null, lon:Number.isFinite(+d.lon)?+d.lon:null, batchImportedAt:new Date().toISOString()
+        });
+        added++;
+    }
+    saveAndSync();
+
+    // إذا لم توجد إحداثيات من AI، حاول geocoding عبر Worker إن تم ضبطه.
+    if (BATCH_GEOCODE_BACKEND_URL) await geocodeMissingParcels();
+
+    const candidates = parcels.filter(p => (p.status === "pending" || p.status === "reattempt") && Number.isFinite(+p.lat) && Number.isFinite(+p.lon));
+    if (!candidates.length) {
+        alert(`تمت إضافة ${added} طرد. تعذر تحديد إحداثيات العناوين. تحقق من العناوين أو اتصال الإنترنت ثم أعد المحاولة.`);
+        return;
+    }
+
+    batchRoute = nearestNeighborRoute(candidates, lastLat, lastLon);
+    batchRouteIndex = 0;
+    renderRouteModal();
+    document.getElementById("routeModal").classList.add("show");
+}
+
+function nearestNeighborRoute(items, startLat, startLon) {
+    const remaining = items.slice();
+    const ordered = [];
+    let lat = startLat, lon = startLon;
+    while (remaining.length) {
+        let bestIndex = 0, bestDistance = Infinity;
+        for (let i=0;i<remaining.length;i++) {
+            const d = calculateDistance(lat, lon, +remaining[i].lat, +remaining[i].lon);
+            if (d < bestDistance) { bestDistance=d; bestIndex=i; }
+        }
+        const next = remaining.splice(bestIndex,1)[0];
+        next.routeDistanceFromPrevious = bestDistance;
+        ordered.push(next);
+        lat = +next.lat; lon = +next.lon;
+    }
+    return ordered;
+}
+
+function estimatedDriveMinutes(km) {
+    // تقدير حضري تقريبي فقط؛ الملاحة الفعلية من Google Maps أدق حسب الازدحام.
+    return Math.max(1, Math.round((km / 32) * 60));
+}
+
+function renderRouteModal() {
+    const totalKm = batchRoute.reduce((sum,p)=>sum+(p.routeDistanceFromPrevious||0),0);
+    document.getElementById("routeSummary").innerHTML = `🚀 <b>${batchRoute.length}</b> توقفات مرتبة<br>📏 المسافة التقريبية: <b>${totalKm.toFixed(1)} كم</b><br>⏱️ زمن القيادة التقريبي: <b>${estimatedDriveMinutes(totalKm)} دقيقة</b><br><span class="batch-small">الترتيب يعتمد على أقرب مسافة مباشرة بين التوقفات. الملاحة الفعلية والازدحام يحددهما تطبيق الخرائط.</span>`;
+    document.getElementById("routeList").innerHTML = batchRoute.map((p,i)=>{
+        const km = p.routeDistanceFromPrevious||0;
+        const mins = estimatedDriveMinutes(km);
+        const nav = `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(getAddress(p))}&travelmode=driving`;
+        return `<div class="route-card ${i===batchRouteIndex?'current':''}"><div><span class="route-num">${i+1}</span><b>${escapeHTML(p.name||"بدون اسم")}</b></div><div class="batch-small">📍 ${escapeHTML(getAddress(p))}<br>📏 <span class="route-distance">${km.toFixed(2)} كم</span> · ⏱️ <span class="route-time">~${mins} دقيقة</span></div><div class="btn-group" style="margin-top:6px;"><a class="action-btn map-btn" href="${nav}" target="_blank" rel="noopener">🧭 الملاحة</a><button class="action-btn deliver-btn" onclick="selectRouteStop(${i})">📦 هذا الطرد</button></div></div>`;
+    }).join("");
+}
+
+function selectRouteStop(i) {
+    batchRouteIndex = i;
+    const p = batchRoute[i];
+    const idx = parcels.indexOf(p);
+    document.getElementById("routeModal").classList.remove("show");
+    if (idx >= 0) {
+        document.getElementById("nextStop").style.display = "block";
+        const km = p.routeDistanceFromPrevious || calculateDistance(lastLat,lastLon,+p.lat,+p.lon);
+        document.getElementById("nextStop").innerHTML = `<b>🚀 الطرد التالي #${i+1}</b><br>${escapeHTML(p.name||"بدون اسم")}<br>${escapeHTML(getAddress(p))}<br>📏 ${km.toFixed(2)} كم · ⏱️ ~${estimatedDriveMinutes(km)} دقيقة <div class="btn-group" style="margin-top:6px;"><button class="action-btn deliver-btn" onclick="markDelivered(${idx})">✅ تسليم</button><a class="action-btn map-btn" target="_blank" rel="noopener" href="https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(getAddress(p))}&travelmode=driving">🧭 ملاحة</a></div>`;
+    }
+}
+
+function showNextStop() {
+    selectRouteStop(batchRouteIndex);
+}
+
+function closeRouteModal() { document.getElementById("routeModal").classList.remove("show"); }
+
+async function geocodeMissingParcels() {
+    const targets = parcels.filter(
+        p =>
+            (p.status === "pending" || p.status === "reattempt") &&
+            (!Number.isFinite(+p.lat) || !Number.isFinite(+p.lon))
+    );
+
+    if (!targets.length) return;
+
+    let cache = {};
+    try {
+        cache = JSON.parse(localStorage.getItem("pro_delivery_geocode_cache_v1") || "{}") || {};
+    } catch {}
+
+    const normalizeAddress = p =>
+        getAddress(p).trim().toLowerCase().replace(/\s+/g, " ");
+
+    const unresolved = [];
+
+    for (const p of targets) {
+        const key = normalizeAddress(p);
+        const cached = cache[key];
+
+        if (cached && Number.isFinite(+cached.lat) && Number.isFinite(+cached.lon)) {
+            p.lat = +cached.lat;
+            p.lon = +cached.lon;
+            p.geocodeProvider = cached.provider || "Photon";
+            continue;
+        }
+
+        unresolved.push(p);
+    }
+
+    if (!unresolved.length) {
+        saveAndSync();
+        return;
+    }
+
+    const status = document.getElementById("batchStatus");
+    let completed = targets.length - unresolved.length;
+
+    if (status) {
+        status.textContent =
+            `📍 تحديد مواقع العناوين: ${completed} / ${targets.length}`;
+    }
+
+    let cursor = 0;
+    const concurrency = Math.min(3, unresolved.length);
+
+    async function geocodeOne(p) {
+        const address = getAddress(p);
+
+        if (!address || address === "عنوان غير مكتمل") return;
+
+        try {
+            const url =
+                BATCH_GEOCODE_BACKEND_URL +
+                "?q=" + encodeURIComponent(address) +
+                "&lat=" + encodeURIComponent(lastLat ?? "") +
+                "&lon=" + encodeURIComponent(lastLon ?? "");
+
+            let response = await fetch(url, { method: "GET" });
+
+            if (response.status === 429) {
+                await new Promise(r => setTimeout(r, 900));
+                response = await fetch(url, { method: "GET" });
+            }
+
+            if (!response.ok) return;
+
+            const d = await response.json();
+
+            if (Number.isFinite(+d.lat) && Number.isFinite(+d.lon)) {
+                p.lat = +d.lat;
+                p.lon = +d.lon;
+                p.geocodeProvider = d.provider || "Photon";
+
+                cache[normalizeAddress(p)] = {
+                    lat: p.lat,
+                    lon: p.lon,
+                    provider: p.geocodeProvider,
+                    savedAt: new Date().toISOString()
+                };
+            }
+        } catch (e) {
+            console.warn("Geocoding failed:", address, e);
+        } finally {
+            completed++;
+
+            if (status) {
+                status.textContent =
+                    `📍 تحديد مواقع العناوين: ${completed} / ${targets.length}`;
+            }
+        }
+    }
+
+    async function worker() {
+        while (cursor < unresolved.length) {
+            const i = cursor++;
+            await geocodeOne(unresolved[i]);
+        }
+    }
+
+    await Promise.all(
+        Array.from({ length: concurrency }, () => worker())
+    );
+
+    localStorage.setItem(
+        "pro_delivery_geocode_cache_v1",
+        JSON.stringify(cache)
+    );
+
+    saveAndSync();
+}
 
 /* =====================================================
    LOADING
@@ -3096,13 +3482,9 @@ window.addEventListener(
         }
 
 
-        if (
-            event.target.id ===
-            "reportModal"
-        ) {
-
-            closeReportModal();
-        }
+        if (event.target.id === "reportModal") closeReportModal();
+        if (event.target.id === "batchModal") closeBatchScanner();
+        if (event.target.id === "routeModal") closeRouteModal();
 
     }
 );
