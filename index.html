@@ -406,57 +406,9 @@
         }
 
 
-        .history-toolbar {
-            display:flex;
-            gap:5px;
-            flex-wrap:wrap;
-            margin-bottom:8px;
-        }
-
-        .history-card {
-            background:#0f172a;
-            border:1px solid #475569;
-            border-radius:8px;
-            padding:9px;
-            margin-bottom:8px;
-        }
-
-        .history-proof {
-            width:100%;
-            max-height:260px;
-            object-fit:contain;
-            background:#020617;
-            border-radius:7px;
-            border:1px solid #475569;
-            margin-top:6px;
-        }
-
-        .signature-preview {
-            width:100%;
-            max-height:180px;
-            object-fit:contain;
-            background:white;
-            border-radius:7px;
-            border:1px solid #64748b;
-            margin-top:6px;
-        }
-
-        #signatureCanvas {
-            width:100%;
-            height:220px;
-            background:#fff;
-            border:2px solid #475569;
-            border-radius:8px;
-            touch-action:none;
-            display:block;
-        }
-
-        .detail-row {
-            font-size:12px;
-            line-height:1.8;
-            color:#cbd5e1;
-        }
-
+        .signature-canvas { width:100%; height:170px; background:#fff; border-radius:7px; touch-action:none; }
+        .route-mini { background:#172554; border:1px solid #2563eb; padding:6px; border-radius:6px; margin:5px 0; }
+        .filter-card { background:#334155; border:1px solid #475569; padding:8px; border-radius:7px; margin-bottom:7px; }
     </style>
 </head>
 
@@ -607,7 +559,7 @@
         <button
             class="action-main-btn"
             style="background:#0ea5e9;"
-            onclick="optimizeRoute()"
+            onclick="optimizeRouteSafe()"
         >
             🗺️ أقرب طرد
         </button>
@@ -621,32 +573,6 @@
         >
             📊 تقرير نهاية اليوم
         </button>
-
-        <div class="btn-group" style="margin-top:6px;">
-            <button
-                class="action-btn map-btn"
-                style="padding:10px;"
-                onclick="showParcelView('today')"
-            >
-                📅 طرود اليوم
-            </button>
-
-            <button
-                class="action-btn edit-btn"
-                style="padding:10px;"
-                onclick="showParcelView('all')"
-            >
-                📦 كل الطرود
-            </button>
-
-            <button
-                class="action-btn proof-btn"
-                style="padding:10px;"
-                onclick="showParcelView('history')"
-            >
-                🕘 History
-            </button>
-        </div>
 
 
         <div
@@ -673,6 +599,16 @@
         id="nextStop"
         class="next-stop"
     ></div>
+
+    <div class="card" id="parcelNavigation" style="padding:7px;">
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:4px;">
+            <button class="action-btn map-btn" onclick="showParcelView('route')">🚚 المسار</button>
+            <button class="action-btn" style="background:#0f766e;" onclick="showParcelView('today')">📅 اليوم</button>
+            <button class="action-btn" style="background:#475569;" onclick="showParcelView('all')">📦 الكل</button>
+            <button class="action-btn" style="background:#7c3aed;" onclick="showParcelView('history')">🕘 History</button>
+        </div>
+        <div id="filteredParcelView" style="margin-top:7px;display:none;"></div>
+    </div>
 
 
     <!-- الطرود -->
@@ -983,25 +919,6 @@ let lastLon =
    INITIALIZE
 ===================================================== */
 
-parcels = parcels.map(parcel => ({
-    ...parcel,
-    createdAt:
-        parcel.createdAt ||
-        parcel.addedAt ||
-        null,
-    signatureUrl:
-        parcel.signatureUrl ||
-        null,
-    proofUrl:
-        parcel.proofUrl ||
-        null
-}));
-
-localStorage.setItem(
-    "saved_parcels",
-    JSON.stringify(parcels)
-);
-
 updateUI();
 initTracker();
 initAI();
@@ -1013,6 +930,8 @@ initAI();
 
 const AI_BACKEND_URL =
     "https://pro-delivery-ai.yasserkhalil.workers.dev";
+
+const GEOCODE_BACKEND_URL = AI_BACKEND_URL + "/geocode";
 
 
 function initAI() {
@@ -1139,121 +1058,74 @@ function fileToDataURL(file) {
 async function analyzeAddressWithAI(
     image
 ) {
+
     if (
         !AI_BACKEND_URL ||
-        AI_BACKEND_URL.includes("ضع_هنا")
+        AI_BACKEND_URL.includes(
+            "ضع_هنا"
+        )
     ) {
+
         throw new Error(
             "ضع رابط الـBackend في AI_BACKEND_URL داخل index.html."
         );
     }
 
-    let mimeType = "image/jpeg";
 
-    if (
-        typeof image === "string" &&
-        image.startsWith("data:")
-    ) {
-        const match = image.match(
-            /^data:([^;]+);base64,/i
+    const response =
+        await fetch(
+            AI_BACKEND_URL,
+            {
+                method: "POST",
+
+                headers: {
+                    "Content-Type":
+                        "application/json"
+                },
+
+                body: JSON.stringify({
+                    image: image
+                })
+            }
         );
 
-        if (match && match[1]) {
-            mimeType = match[1].toLowerCase();
-        }
-    }
 
-    const supportedTypes = [
-        "image/jpeg",
-        "image/jpg",
-        "image/png",
-        "image/webp",
-        "image/heic",
-        "image/heif",
-        "image/gif",
-        "image/avif"
-    ];
+    if (!response.ok) {
 
-    if (!supportedTypes.includes(mimeType)) {
-        mimeType = "image/jpeg";
-    }
-
-    const response = await fetch(
-        AI_BACKEND_URL,
-        {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json"
-            },
-            body: JSON.stringify({
-                image: image,
-                mimeType: mimeType
-            })
-        }
-    );
-
-    let data = {};
-    try {
-        data = await response.json();
-    } catch {}
-
-    if (!response.ok || !data.success) {
         let message =
-            data.error ||
             "فشل الاتصال بالـAI.";
 
-        if (data.httpStatus) {
-            message += "\n\nHTTP: " + data.httpStatus;
-        }
+        try {
 
-        if (data.details) {
-            message +=
-                "\n\nتفاصيل:\n" +
-                JSON.stringify(
-                    data.details,
-                    null,
-                    2
-                );
-        }
+            const data =
+                await response.json();
 
-        throw new Error(message);
+            message =
+                data.error ||
+                message;
+
+        } catch {}
+
+        throw new Error(
+            message
+        );
     }
 
-    const ai = data.data || {};
 
-    return {
-        name:
-            ai.recipientName ||
-            ai.name ||
-            "",
-        street:
-            ai.street ||
-            "",
-        house:
-            ai.houseNumber ||
-            ai.house ||
-            "",
-        zip:
-            ai.postalCode ||
-            ai.zip ||
-            "",
-        city:
-            ai.city ||
-            "",
-        phone:
-            ai.phone ||
-            "",
-        barcode:
-            ai.trackingNumber ||
-            ai.barcode ||
-            "",
-        raw_text:
-            ai.address ||
-            ai.raw_text ||
-            "",
-        confidence:
-            ai.confidence || 0
-    };
+    const data =
+        await response.json();
+
+
+    if (!data.success) {
+
+        throw new Error(
+            data.error ||
+            "فشل تحليل الصورة."
+        );
+    }
+
+
+    return data.data || {};
 }
 
 
@@ -1341,11 +1213,6 @@ function saveParcelForm() {
                 ? parcels[index].id
                 : Date.now(),
 
-        createdAt:
-            index !== ""
-                ? parcels[index].createdAt || new Date().toISOString()
-                : new Date().toISOString(),
-
         name:
             document.getElementById(
                 "fName"
@@ -1393,7 +1260,17 @@ function saveParcelForm() {
 
         proofUrl:
             index !== ""
-                ? parcels[index].proofUrl || null
+                ? parcels[index].proofUrl
+                : null,
+
+        createdAt:
+            index !== ""
+                ? (parcels[index].createdAt || new Date().toISOString())
+                : new Date().toISOString(),
+
+        deliveredAt:
+            index !== ""
+                ? parcels[index].deliveredAt || null
                 : null,
 
         signatureUrl:
@@ -1401,19 +1278,29 @@ function saveParcelForm() {
                 ? parcels[index].signatureUrl || null
                 : null,
 
-        deliveredAt:
+        signatureAt:
             index !== ""
-                ? parcels[index].deliveredAt || null
+                ? parcels[index].signatureAt || null
                 : null,
 
-        deliveredLat:
+        lat:
             index !== ""
-                ? parcels[index].deliveredLat ?? null
+                ? parcels[index].lat ?? null
                 : null,
 
-        deliveredLon:
+        lon:
             index !== ""
-                ? parcels[index].deliveredLon ?? null
+                ? parcels[index].lon ?? null
+                : null,
+
+        routeOrder:
+            index !== ""
+                ? parcels[index].routeOrder ?? null
+                : null,
+
+        routeDistanceKm:
+            index !== ""
+                ? parcels[index].routeDistanceKm ?? null
                 : null
     };
 
@@ -2507,6 +2394,8 @@ function updateUI() {
                             ? `
                                 <button
                                     class="action-btn deliver-btn"
+                                    data-parcel-action="deliver"
+                                    data-parcel-index="${index}"
                                     onclick="markDelivered(${index})"
                                 >
                                     ✅ تسليم
@@ -2522,6 +2411,8 @@ function updateUI() {
                             ? `
                                 <button
                                     class="action-btn absent-btn"
+                                    data-parcel-action="absent"
+                                    data-parcel-index="${index}"
                                     onclick="markAbsent(${index})"
                                 >
                                     🏠 غياب
@@ -2533,6 +2424,8 @@ function updateUI() {
 
                     <button
                         class="action-btn proof-btn"
+                        data-parcel-action="proof"
+                        data-parcel-index="${index}"
                         onclick="takeProof(${index})"
                     >
                         📸 صورة
@@ -2575,7 +2468,31 @@ function updateUI() {
    DELIVERED
 ===================================================== */
 
-/* Original markDelivered replaced above. */
+function markDelivered(
+    index
+) {
+
+    const parcel = parcels[index];
+    if (!parcel) return;
+
+    parcel.status = "delivered";
+    parcel.deliveredAt = new Date().toISOString();
+
+    // Save the current GPS position when available.
+    if (Number.isFinite(Number(lastLat)) && Number.isFinite(Number(lastLon))) {
+        parcel.deliveryLat = Number(lastLat);
+        parcel.deliveryLon = Number(lastLon);
+    }
+
+    saveAndSync();
+
+    // Keep the user on the same page and show a clear confirmation.
+    setTimeout(() => {
+        try {
+            alert("تم تأكيد تسليم الطرد وحفظه في History.");
+        } catch (_) {}
+    }, 0);
+}
 
 
 /* =====================================================
@@ -2695,6 +2612,78 @@ function editParcel(
     ).classList.add(
         "show"
     );
+}
+
+
+/* =====================================================
+   PROOF OF DELIVERY
+===================================================== */
+
+function takeProof(
+    index
+) {
+
+    const input =
+        document.createElement(
+            "input"
+        );
+
+
+    input.type =
+        "file";
+
+    input.accept =
+        "image/*";
+
+    input.capture =
+        "environment";
+
+
+    input.onchange =
+        event => {
+
+            const file =
+                event.target.files?.[0];
+
+
+            if (!file)
+                return;
+
+
+            const reader =
+                new FileReader();
+
+
+            reader.onload =
+                function(event) {
+
+                    parcels[index]
+                        .proofUrl =
+                        event.target.result;
+
+
+                    parcels[index]
+                        .status =
+                        "delivered";
+
+
+                    parcels[index]
+                        .deliveredAt =
+                        new Date()
+                            .toISOString();
+
+
+                    saveAndSync();
+                };
+
+
+            reader.readAsDataURL(
+                file
+            );
+        };
+
+
+    input.click();
 }
 
 
@@ -2991,30 +2980,6 @@ window.addEventListener(
             closeReportModal();
         }
 
-        if (
-            event.target.id ===
-            "parcelViewModal"
-        ) {
-
-            closeParcelView();
-        }
-
-        if (
-            event.target.id ===
-            "parcelDetailsModal"
-        ) {
-
-            closeParcelDetails();
-        }
-
-        if (
-            event.target.id ===
-            "signatureModal"
-        ) {
-
-            closeSignatureModal();
-        }
-
     }
 );
 
@@ -3047,24 +3012,283 @@ window.addEventListener(
 updateConnection();
 
 
-/* Make the parcel-history controls available to inline onclick handlers. */
+
+/* =====================================================
+   STABLE PARCEL VIEWS — DOES NOT TOUCH parcelsList
+   ===================================================== */
+
+function parcelDate(parcel) {
+    return parcel.createdAt || parcel.deliveredAt || null;
+}
+
+function isParcelToday(parcel) {
+    const raw = parcelDate(parcel);
+    if (!raw) return false;
+    const d = new Date(raw);
+    if (Number.isNaN(d.getTime())) return false;
+    const n = new Date();
+    return d.getFullYear() === n.getFullYear() &&
+           d.getMonth() === n.getMonth() &&
+           d.getDate() === n.getDate();
+}
+
+function phoneForWhatsApp(phone) {
+    let p = String(phone || '').replace(/[^\d+]/g,'');
+    if (p.startsWith('00')) p = '+' + p.slice(2);
+    if (p.startsWith('0')) p = '+49' + p.slice(1);
+    return p.replace(/\D/g,'');
+}
+
+function parcelStatusHTML(parcel) {
+    if (parcel.status === 'delivered') return '<span class="status-badge status-delivered">✓ تم التسليم</span>';
+    if (parcel.status === 'absent') return '<span class="status-badge status-absent">✕ غياب</span>';
+    if (parcel.status === 'reattempt') return '<span class="status-badge status-reattempt">🔄 إعادة</span>';
+    return '<span class="status-badge">قيد الانتظار</span>';
+}
+
+function renderFilteredParcel(parcel, index) {
+    const address = getAddress(parcel);
+    const phone = parcel.phone || '';
+    const wa = phoneForWhatsApp(phone);
+    return `
+        <div class="filter-card">
+            <div class="parcel-info">
+                <span>📦 #${index + 1}${parcel.barcode ? ' · ' + escapeHTML(parcel.barcode) : ''}</span>
+                ${parcelStatusHTML(parcel)}
+            </div>
+            <div class="parcel-info">👤 ${escapeHTML(parcel.name || 'بدون اسم')}</div>
+            <div class="address-box">📍 ${escapeHTML(address)}</div>
+            ${parcel.routeOrder ? `<div class="route-mini">🔢 ترتيب المسار: ${parcel.routeOrder} · 📏 ${Number(parcel.routeDistanceKm || 0).toFixed(2)} كم</div>` : ''}
+            ${parcel.deliveredAt ? `<div class="parcel-fields">🕐 تم التسليم: ${new Date(parcel.deliveredAt).toLocaleString('de-DE')}</div>` : ''}
+            ${parcel.notes ? `<div class="parcel-fields">📝 ${escapeHTML(parcel.notes)}</div>` : ''}
+            <div class="btn-group">
+                <button class="action-btn map-btn" data-parcel-action="navigation" data-parcel-index="${index}" onclick="openParcelNavigation(${index})">🧭 ملاحة</button>
+                ${phone ? `<a class="action-btn wa-btn" target="_blank" href="https://wa.me/${wa}">💬 WhatsApp</a>` : ''}
+                ${phone ? `<a class="action-btn" style="background:#2563eb" href="tel:${escapeHTML(phone)}">📞 اتصال</a>` : ''}
+                ${parcel.status !== 'delivered' ? `<button class="action-btn deliver-btn" data-parcel-action="deliver" data-parcel-index="${index}" onclick="markDelivered(${index})">✅ تسليم</button>` : ''}
+                <button class="action-btn proof-btn" data-parcel-action="proof" data-parcel-index="${index}" onclick="takeProof(${index})">📸 صورة</button>
+                <button class="action-btn" style="background:#9333ea" data-parcel-action="signature" data-parcel-index="${index}" onclick="openSignature(${index})">✍️ توقيع</button>
+                <button class="action-btn edit-btn" data-parcel-action="edit" data-parcel-index="${index}" onclick="editParcel(${index})">✏️ تعديل</button>
+            </div>
+            ${parcel.proofUrl ? `<div style="margin-top:6px"><b>📸 صورة التسليم</b><img class="proof-img" src="${escapeHTML(parcel.proofUrl)}"></div>` : ''}
+            ${parcel.signatureUrl ? `<div style="margin-top:6px"><b>✍️ توقيع المستلم</b><img class="proof-img" src="${escapeHTML(parcel.signatureUrl)}"></div>` : ''}
+            ${parcel.status === 'delivered' && phone ? `<button class="action-main-btn" style="background:#16a34a;margin-top:6px" onclick="sendDeliveryConfirmation(${index})">💬 تأكيد التسليم WhatsApp</button>` : ''}
+        </div>`;
+}
+
+function showParcelView(view) {
+    const box = document.getElementById('filteredParcelView');
+    if (!box) return;
+
+    const original = document.getElementById('parcelsList');
+    const originalCard = original ? original.closest('.card') : null;
+
+    // Keep the original "الطرود بالشنطة" list visible for ALL.
+    if (originalCard) originalCard.style.display = view === 'all' ? 'block' : 'none';
+
+    if (view === 'all') {
+        box.style.display = 'none';
+        return;
+    }
+
+    box.style.display = 'block';
+
+    let list = [];
+    if (view === 'today') {
+        list = parcels.filter(isParcelToday);
+    } else if (view === 'history') {
+        list = parcels.filter(p => p.status === 'delivered');
+    } else {
+        list = parcels.filter(p => p.status === 'pending' || p.status === 'reattempt');
+        list.sort((a,b) => Number(a.routeOrder || 999999) - Number(b.routeOrder || 999999));
+    }
+
+    const title = view === 'today' ? '📅 طرود اليوم' : view === 'history' ? '🕘 الطرود المستلمة' : '🚚 مسار التسليم';
+    box.innerHTML = `<div style="font-weight:bold;color:#38bdf8;margin-bottom:6px">${title} <span class="section-count">(${list.length})</span></div>` +
+        (list.length ? list.map(p => renderFilteredParcel(p, parcels.indexOf(p))).join('') : '<div class="empty">لا توجد طرود هنا.</div>');
+}
+
+function openParcelNavigation(index) {
+    const p = parcels[index];
+    const destination = Number.isFinite(Number(p.lat)) && Number.isFinite(Number(p.lon))
+        ? `${p.lat},${p.lon}`
+        : getAddress(p);
+    window.open('https://www.google.com/maps/dir/?api=1&destination=' + encodeURIComponent(destination), '_blank');
+}
+
+function sendDeliveryConfirmation(index) {
+    const p = parcels[index];
+    const wa = phoneForWhatsApp(p.phone);
+    if (!wa) return alert('لا يوجد رقم هاتف لهذا الطرد.');
+    const text = 'Hallo, Ihr Paket wurde erfolgreich zugestellt. Vielen Dank!';
+    window.open('https://wa.me/' + wa + '?text=' + encodeURIComponent(text), '_blank');
+}
+
+function openSignature(index) {
+    let modal = document.getElementById('signatureModal');
+    if (!modal) {
+        modal = document.createElement('div');
+        modal.id = 'signatureModal';
+        modal.className = 'modal show';
+        modal.innerHTML = `
+            <div class="modal-content">
+                <h3>✍️ توقيع المستلم</h3>
+                <canvas id="signatureCanvas" class="signature-canvas" width="900" height="400"></canvas>
+                <div class="modal-actions">
+                    <button class="modal-btn" onclick="saveSignature()">✅ حفظ</button>
+                    <button class="modal-btn close-btn" onclick="clearSignature()">🗑️ مسح</button>
+                </div>
+                <button class="modal-btn close-btn" style="width:100%;margin-top:6px" onclick="closeSignature()">إغلاق</button>
+            </div>`;
+        document.body.appendChild(modal);
+        setupSignatureCanvas();
+    }
+    modal.dataset.index = String(index);
+    modal.classList.add('show');
+    clearSignature();
+}
+
+function setupSignatureCanvas() {
+    const canvas = document.getElementById('signatureCanvas');
+    if (!canvas || canvas.dataset.ready) return;
+    canvas.dataset.ready = '1';
+    const ctx = canvas.getContext('2d');
+    ctx.lineWidth = 3; ctx.lineCap = 'round'; ctx.strokeStyle = '#111827';
+    let drawing = false;
+    const point = e => {
+        const r = canvas.getBoundingClientRect();
+        const q = e.touches ? e.touches[0] : e;
+        return {x:(q.clientX-r.left)*canvas.width/r.width, y:(q.clientY-r.top)*canvas.height/r.height};
+    };
+    const start = e => { drawing=true; const p=point(e); ctx.beginPath(); ctx.moveTo(p.x,p.y); e.preventDefault(); };
+    const move = e => { if(!drawing)return; const p=point(e); ctx.lineTo(p.x,p.y); ctx.stroke(); e.preventDefault(); };
+    const stop = () => drawing=false;
+    canvas.addEventListener('mousedown',start); canvas.addEventListener('mousemove',move); canvas.addEventListener('mouseup',stop); canvas.addEventListener('mouseleave',stop);
+    canvas.addEventListener('touchstart',start,{passive:false}); canvas.addEventListener('touchmove',move,{passive:false}); canvas.addEventListener('touchend',stop);
+}
+
+function clearSignature() {
+    const c=document.getElementById('signatureCanvas');
+    if(c) c.getContext('2d').clearRect(0,0,c.width,c.height);
+}
+
+function closeSignature() {
+    const m=document.getElementById('signatureModal');
+    if(m) m.classList.remove('show');
+}
+
+function saveSignature() {
+    const m=document.getElementById('signatureModal');
+    const c=document.getElementById('signatureCanvas');
+    if(!m || !c) return;
+    const index=Number(m.dataset.index);
+    const pixels=c.getContext('2d').getImageData(0,0,c.width,c.height).data;
+    let ink=false;
+    for(let i=3;i<pixels.length;i+=4){ if(pixels[i]>0){ink=true;break;} }
+    if(!ink) return alert('يرجى توقيع المستلم أولًا.');
+    parcels[index].signatureUrl=c.toDataURL('image/png');
+    parcels[index].signatureAt=new Date().toISOString();
+    saveAndSync();
+    closeSignature();
+}
+
+/* Preserve the original list: these additions only add filtered views. */
+const originalSaveParcelForm = window.saveParcelForm;
+
+async function geocodeForRoute(parcel) {
+    if (Number.isFinite(Number(parcel.lat)) && Number.isFinite(Number(parcel.lon))) return true;
+    const address = getAddress(parcel);
+    if (!address || address === 'عنوان غير مكتمل') return false;
+    try {
+        const r = await fetch(GEOCODE_BACKEND_URL + '?q=' + encodeURIComponent(address));
+        const d = await r.json();
+        if (!d.success || !Number.isFinite(Number(d.lat)) || !Number.isFinite(Number(d.lon))) return false;
+        parcel.lat=Number(d.lat); parcel.lon=Number(d.lon);
+        return true;
+    } catch(e) { return false; }
+}
+
+async function optimizeRouteSafe() {
+    const candidates=parcels.filter(p=>p.status==='pending'||p.status==='reattempt');
+    if(!candidates.length) return alert('لا توجد طرود متبقية.');
+    if(lastLat===null||lastLon===null) return alert('اسمح للتطبيق بالوصول إلى موقعك أولًا.');
+    showLoading(true);
+    try {
+        for(let i=0;i<candidates.length;i++){
+            await geocodeForRoute(candidates[i]);
+            document.getElementById('loading').textContent=`📍 تحديد مواقع الطرود ${i+1}/${candidates.length}`;
+            if(i<candidates.length-1) await new Promise(r=>setTimeout(r,1100));
+        }
+        const remaining=candidates.filter(p=>Number.isFinite(Number(p.lat))&&Number.isFinite(Number(p.lon)));
+        if(!remaining.length) throw new Error('لم يتم العثور على إحداثيات للطرود.');
+        const ordered=[]; let lat=Number(lastLat), lon=Number(lastLon);
+        while(remaining.length){
+            let bi=0, bd=Infinity;
+            remaining.forEach((p,i)=>{const d=calculateDistance(lat,lon,p.lat,p.lon);if(d<bd){bd=d;bi=i;}});
+            const p=remaining.splice(bi,1)[0];
+            p.routeOrder=ordered.length+1; p.routeDistanceKm=Number(bd.toFixed(2));
+            ordered.push(p); lat=p.lat; lon=p.lon;
+        }
+        saveAndSync();
+        showParcelView('route');
+        const n=ordered[0];
+        const next=document.getElementById('nextStop');
+        if(next){next.style.display='block';next.innerHTML=`<b>🚚 الطرد التالي</b><br>📍 ${escapeHTML(getAddress(n))}<br>📏 ${n.routeDistanceKm} كم<br><button class="action-btn map-btn" style="width:100%;margin-top:5px" onclick="openParcelNavigation(${parcels.indexOf(n)})">🧭 الملاحة</button>`;}
+    } catch(e){ alert(e.message||'تعذر ترتيب المسار.'); }
+    finally { setTimeout(()=>showLoading(false),700); }
+}
+
+// Initialize views after the original UI has rendered. The original list remains the source of truth.
+setTimeout(() => {
+    parcels.forEach(p => { if(!p.createdAt) p.createdAt = p.id ? new Date(Number(p.id)).toISOString() : new Date().toISOString(); });
+    localStorage.setItem('saved_parcels', JSON.stringify(parcels));
+    showParcelView('all');
+}, 0);
+
+
+/* =====================================================
+   ROBUST PARCEL ACTION HANDLERS
+   Works for dynamically rendered parcel cards too.
+===================================================== */
+
+window.markDelivered = markDelivered;
+window.markAbsent = markAbsent;
+window.takeProof = takeProof;
+window.openSignature = openSignature;
+window.editParcel = editParcel;
+window.openParcelNavigation = openParcelNavigation;
+window.sendDeliveryConfirmation = sendDeliveryConfirmation;
 window.showParcelView = showParcelView;
-window.closeParcelView = closeParcelView;
-window.showParcelDetails = showParcelDetails;
-window.closeParcelDetails = closeParcelDetails;
-window.openSignatureModal = openSignatureModal;
-window.closeSignatureModal = closeSignatureModal;
 
+if (!window.__parcelActionHandlerInstalled) {
+    window.__parcelActionHandlerInstalled = true;
 
-document.addEventListener("DOMContentLoaded", function () {
-    const historyBtn = document.querySelector('[onclick="showParcelView(\'history\')"]');
-    const todayBtn = document.querySelector('[onclick="showParcelView(\'today\')"]');
-    const allBtn = document.querySelector('[onclick="showParcelView(\'all\')"]');
+    document.addEventListener('click', function (event) {
+        const button = event.target.closest('[data-parcel-action]');
+        if (!button) return;
 
-    if (historyBtn) historyBtn.onclick = function () { window.showParcelView("history"); };
-    if (todayBtn) todayBtn.onclick = function () { window.showParcelView("today"); };
-    if (allBtn) allBtn.onclick = function () { window.showParcelView("all"); };
-});
+        const action = button.dataset.parcelAction;
+        const index = Number(button.dataset.parcelIndex);
+
+        if (!Number.isInteger(index) || !parcels[index]) return;
+
+        event.preventDefault();
+        event.stopPropagation();
+
+        try {
+            if (action === 'deliver') markDelivered(index);
+            else if (action === 'proof') takeProof(index);
+            else if (action === 'signature') openSignature(index);
+            else if (action === 'edit') editParcel(index);
+            else if (action === 'absent') markAbsent(index);
+            else if (action === 'navigation') openParcelNavigation(index);
+            else if (action === 'whatsapp') sendDeliveryConfirmation(index);
+        } catch (error) {
+            console.error('Parcel action error:', error);
+            alert('تعذر تنفيذ العملية. حاول مرة أخرى.');
+        }
+    });
+}
 
 </script>
 
