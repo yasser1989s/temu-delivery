@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#0f172a">
+  <meta name="description" content="Pro Delivery - مساعد توصيل طرود يعمل على الهاتف ويدعم العمل دون اتصال">
+  <link rel="manifest" href="manifest.json">
+  <link rel="apple-touch-icon" href="icons/icon-192.svg">
+  <link rel="stylesheet" href="css.css">
+  <title>Pro Delivery</title>
+</head>
+<body>
+<header class="topbar">
+  <div>
+    <h1>📦 Pro Delivery</h1>
+    <small id="syncState">جاهز للعمل</small>
+  </div>
+  <button id="installBtn" class="icon-btn hidden" title="تثبيت التطبيق">⬇️</button>
+</header>
+
+<main>
+  <section class="stats">
+    <div><b id="totalCount">0</b><span>الإجمالي</span></div>
+    <div class="ok"><b id="deliveredCount">0</b><span>تم</span></div>
+    <div class="warn"><b id="remainingCount">0</b><span>متبقي</span></div>
+    <div class="bad"><b id="absentCount">0</b><span>غياب</span></div>
+    <div class="info"><b id="distanceKm">0.00</b><span>كم</span></div>
+    <div><b id="successRate">0%</b><span>نجاح</span></div>
+  </section>
+
+  <section class="cockpit card" id="cockpit">
+    <div class="section-title"><span>🚀 الجولة</span><button id="optimizeBtn" class="small-btn">تحسين المسار</button></div>
+    <div id="nextStop" class="next-stop empty">أضف طرودًا ثم اضغط «تحسين المسار»</div>
+  </section>
+
+  <section class="actions card">
+    <button id="scanBarcodeBtn" class="main-btn blue">🔳 مسح باركود</button>
+    <button id="scanParcelBtn" class="main-btn">📷 مسح بوليصة + OCR</button>
+    <button id="batchBtn" class="main-btn purple">⚡ وضع المسح السريع</button>
+    <button id="pasteBtn" class="main-btn green">📋 لصق عنوان</button>
+    <button id="voiceBtn" class="main-btn pink">🎙️ إدخال صوتي</button>
+  </section>
+
+  <section class="filters card">
+    <input id="searchInput" type="search" placeholder="🔎 ابحث بالباركود، الاسم، العنوان، الهاتف...">
+    <div class="chips">
+      <button class="chip active" data-filter="all">الكل</button>
+      <button class="chip" data-filter="pending">متبقي</button>
+      <button class="chip" data-filter="delivered">تم</button>
+      <button class="chip" data-filter="absent">غياب</button>
+      <button class="chip" data-filter="reattempt">إعادة</button>
+      <button class="chip" data-filter="problem">مشكلة</button>
+    </div>
+  </section>
+
+  <section class="card">
+    <div class="section-title">
+      <span>📦 الطرود</span>
+      <button id="resetBtn" class="small-btn danger">إعادة ضبط اليوم</button>
+    </div>
+    <div id="parcelsList" class="parcel-list"></div>
+    <div id="emptyMsg" class="empty">لا توجد طرود بعد.</div>
+  </section>
+
+  <section class="card">
+    <div class="section-title"><span>📊 تقرير اليوم</span><button id="reportBtn" class="small-btn">إنشاء</button></div>
+    <pre id="reportPreview" class="report">لا يوجد تقرير بعد.</pre>
+    <div class="row">
+      <button id="copyReportBtn" class="small-btn">📋 نسخ</button>
+      <button id="exportBtn" class="small-btn">⬇️ تصدير CSV</button>
+    </div>
+  </section>
+</main>
+
+<div id="scannerModal" class="modal hidden">
+  <div class="modal-box scanner-box">
+    <div class="modal-head"><b id="scannerTitle">ماسح الباركود</b><button class="close-btn" data-close="scannerModal">×</button></div>
+    <video id="scannerVideo" playsinline muted></video>
+    <div id="scannerHint" class="hint">وجّه الكاميرا إلى الباركود</div>
+    <div id="scanResult" class="scan-result"></div>
+  </div>
+</div>
+
+<div id="parcelModal" class="modal hidden">
+  <div class="modal-box">
+    <div class="modal-head"><b>بيانات الطرد</b><button class="close-btn" data-close="parcelModal">×</button></div>
+    <form id="parcelForm">
+      <input type="hidden" id="editId">
+      <label>Barcode<input id="fBarcode" autocomplete="off"></label>
+      <label>الاسم<input id="fName" autocomplete="name"></label>
+      <label>الشارع<input id="fStreet"></label>
+      <div class="two"><label>رقم المنزل<input id="fHouse"></label><label>PLZ<input id="fZip" inputmode="numeric"></label></div>
+      <label>المدينة<input id="fCity"></label>
+      <label>الهاتف<input id="fPhone" inputmode="tel"></label>
+      <label>ملاحظات<input id="fNotes"></label>
+      <div class="row"><button class="main-btn" type="submit">حفظ الطرد</button><button class="small-btn" type="button" data-close="parcelModal">إلغاء</button></div>
+    </form>
+  </div>
+</div>
+
+<div id="noteModal" class="modal hidden">
+  <div class="modal-box">
+    <div class="modal-head"><b>ملاحظة للعنوان</b><button class="close-btn" data-close="noteModal">×</button></div>
+    <textarea id="noteText" rows="5" placeholder="مثلاً: Eingang خلف المبنى، 3. OG..."></textarea>
+    <button id="saveNoteBtn" class="main-btn">حفظ</button>
+  </div>
+</div>
+
+<div id="loading" class="loading hidden">⏳ جاري المعالجة...</div>
+<input id="parcelImage" type="file" accept="image/*" capture="environment" class="hidden">
+<input id="proofImage" type="file" accept="image/*" capture="environment" class="hidden">
+
+<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+<script type="module" src="js/app.js"></script>
+</body>
+</html>
