@@ -405,6 +405,10 @@
             display: none;
         }
 
+
+        .signature-canvas { width:100%; height:170px; background:#fff; border-radius:7px; touch-action:none; }
+        .route-mini { background:#172554; border:1px solid #2563eb; padding:6px; border-radius:6px; margin:5px 0; }
+        .filter-card { background:#334155; border:1px solid #475569; padding:8px; border-radius:7px; margin-bottom:7px; }
     
 /* =========================================================
            MODERN PRO DELIVERY UI
@@ -798,9 +802,36 @@
                 font-size: 19px;
             }
         }
-
-    
     </style>
+
+<style id="batch-camera-style">
+#batchCameraModal{
+  position:fixed;inset:0;background:rgba(0,0,0,.92);z-index:99999;
+  display:none;align-items:center;justify-content:center;padding:14px;
+}
+#batchCameraModal.show{display:flex}
+.batch-camera-box{
+  width:min(520px,100%);max-height:96vh;overflow:auto;background:#0f172a;
+  border:1px solid #334155;border-radius:18px;padding:14px;color:#fff;
+}
+#batchCameraVideo{
+  width:100%;display:block;background:#000;border-radius:14px;
+  aspect-ratio:3/4;object-fit:cover;
+}
+.batch-camera-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}
+.batch-camera-actions button{
+  border:0;border-radius:12px;padding:13px;font-weight:800;font-size:14px;cursor:pointer;
+}
+#batchCaptureBtn{background:#10b981;color:#fff}
+#batchFinishBtn{background:#0ea5e9;color:#fff}
+#batchCameraCloseBtn{background:#334155;color:#fff}
+#batchGalleryBtn{background:#7c3aed;color:#fff}
+#batchPhotoCount{text-align:center;color:#cbd5e1;margin:8px 0;font-size:13px}
+#batchThumbs{display:flex;gap:6px;overflow-x:auto;padding:4px 0}
+#batchThumbs img{width:58px;height:76px;object-fit:cover;border-radius:7px;border:1px solid #475569;flex:none}
+#batchCameraStatus{text-align:center;color:#93c5fd;min-height:20px;margin-top:7px;font-size:12px}
+</style>
+
 </head>
 
 
@@ -910,7 +941,7 @@
             id="aiScanBtn"
             class="action-main-btn ai-btn"
         >
-            🤖 📷 قراءة العنوان مجانًا
+            🤖 📷 قراءة العنوان بالـAI
         </button>
 
         <input
@@ -920,6 +951,22 @@
             capture="environment"
             hidden
         >
+        <button
+            id="batchImportBtn"
+            class="action-main-btn"
+            style="background:#0f766e;"
+        >
+            📦➕ إضافة كل الطرود دفعة واحدة
+        </button>
+
+        <input
+            id="batchImportInput"
+            type="file"
+            accept="image/*"
+            multiple
+            hidden
+        >
+
 
 
         <!-- OCR محلي احتياطي -->
@@ -977,7 +1024,7 @@
         <button
             class="action-main-btn"
             style="background:#0ea5e9;"
-            onclick="optimizeRoute()"
+            onclick="optimizeRouteSafe()"
         >
             🗺️ أقرب طرد
         </button>
@@ -1018,6 +1065,31 @@
         class="next-stop"
     ></div>
 
+    <div class="card navigation-card" id="parcelNavigation">
+        <div class="nav-title">
+            <span>إدارة الطرود</span>
+            <small>تنقّل سريع</small>
+        </div>
+        <div class="parcel-nav-grid">
+            <button class="nav-tile nav-route" onclick="showParcelView('route')">
+                <span class="nav-tile-icon">🚚</span>
+                <span>المسار</span>
+            </button>
+            <button class="nav-tile nav-today" onclick="showParcelView('today')">
+                <span class="nav-tile-icon">📅</span>
+                <span>اليوم</span>
+            </button>
+            <button class="nav-tile nav-all" onclick="showParcelView('all')">
+                <span class="nav-tile-icon">📦</span>
+                <span>الكل</span>
+            </button>
+            <button class="nav-tile nav-history" onclick="showParcelView('history')">
+                <span class="nav-tile-icon">🕘</span>
+                <span>History</span>
+            </button>
+        </div>
+        <div id="filteredParcelView" style="margin-top:10px;display:none;"></div>
+    </div>
 
     <!-- الطرود -->
 
@@ -1333,532 +1405,771 @@ initAI();
 
 
 /* =====================================================
-   FREE LOCAL DOCUMENT SCANNER
-   - No OpenAI
-   - No Cloudflare
-   - OCR runs in the browser
+   AI CAMERA
 ===================================================== */
 
-let localOCRWorker = null;
-let localOCRPromise = null;
-let zxingPromise = null;
+const AI_BACKEND_URL =
+    "https://pro-delivery-ai.yasserkhalil.workers.dev";
+
+const GEOCODE_BACKEND_URL = AI_BACKEND_URL + "/geocode";
 
 
 function initAI() {
 
-    const button = document.getElementById("aiScanBtn");
-    const input = document.getElementById("aiCameraInput");
-
-    if (!button || !input) return;
-
-    button.addEventListener("click", () => input.click());
-
-    input.addEventListener("change", async event => {
-
-        const file = event.target.files?.[0];
-        event.target.value = "";
-
-        if (!file) return;
-
-        await runLocalDocumentScan(file, button);
-    });
-}
-
-
-async function runLocalDocumentScan(file, button) {
-
-    showLoading(true);
-    button.disabled = true;
-    button.innerText = "📷 جاري قراءة الورقة محليًا...";
-
-    try {
-
-        const result = await scanDocumentLocally(file);
-
-        openParcelForm(result);
-
-    } catch (error) {
-
-        console.error("LOCAL SCANNER ERROR", error);
-
-        alert(
-            "تعذر قراءة الورقة:\n\n" +
-            (error?.message || "خطأ غير معروف")
+    const button =
+        document.getElementById(
+            "aiScanBtn"
         );
 
-    } finally {
-
-        showLoading(false);
-        button.disabled = false;
-        button.innerText = "🤖 📷 قراءة العنوان مجانًا";
-    }
-}
-
-
-async function loadTesseractScript() {
-
-    if (window.Tesseract) return window.Tesseract;
-
-    return new Promise((resolve, reject) => {
-
-        const script = document.createElement("script");
-        script.src = "https://cdn.jsdelivr.net/npm/tesseract.js@7.0.0/dist/tesseract.min.js";
-        script.async = true;
-
-        script.onload = () => resolve(window.Tesseract);
-        script.onerror = () => reject(
-            new Error("تعذر تحميل محرك OCR. تأكد من اتصال الإنترنت.")
+    const input =
+        document.getElementById(
+            "aiCameraInput"
         );
 
-        document.head.appendChild(script);
-    });
-}
+    if (!button || !input)
+        return;
 
 
-async function getOCRWorker() {
+    button.addEventListener(
+        "click",
+        () => {
 
-    if (localOCRWorker) return localOCRWorker;
-    if (localOCRPromise) return localOCRPromise;
+            input.click();
 
-    localOCRPromise = (async () => {
+        }
+    );
 
-        const TesseractLib = await loadTesseractScript();
 
-        // German + English is appropriate for German delivery labels.
-        const worker = await TesseractLib.createWorker("deu+eng", 1, {
-            logger: message => {
+    input.addEventListener(
+        "change",
+        async event => {
 
-                if (message?.status === "recognizing text" && message.progress) {
+            const file =
+                event.target.files?.[0];
 
-                    const percent = Math.round(message.progress * 100);
+            event.target.value = "";
 
-                    const loading = document.getElementById("loading");
-                    if (loading) {
-                        loading.innerText =
-                            `⏳ جاري قراءة الورقة محليًا... ${percent}%`;
-                    }
-                }
+            if (!file)
+                return;
+
+
+            showLoading(true);
+
+            button.disabled = true;
+
+            button.innerText =
+                "🤖 جاري تحليل الورقة...";
+
+
+            try {
+
+                const image =
+                    await fileToDataURL(
+                        file
+                    );
+
+
+                const result =
+                    await analyzeAddressWithAI(
+                        image
+                    );
+
+
+                openParcelForm(
+                    result
+                );
+
+
+            } catch(error) {
+
+                console.error(error);
+
+                alert(
+                    "تعذر تحليل الصورة:\n\n" +
+                    error.message
+                );
+
+            } finally {
+
+                showLoading(false);
+
+                button.disabled =
+                    false;
+
+                button.innerText =
+                    "🤖 📷 قراءة العنوان بالـAI";
             }
-        });
 
-        localOCRWorker = worker;
-        return worker;
-
-    })();
-
-    try {
-        return await localOCRPromise;
-    } catch (error) {
-        localOCRPromise = null;
-        throw error;
-    }
-}
-
-
-function loadImage(file) {
-
-    return new Promise((resolve, reject) => {
-
-        const reader = new FileReader();
-        const img = new Image();
-
-        reader.onload = () => {
-            img.onload = () => resolve(img);
-            img.onerror = () => reject(new Error("تعذر فتح الصورة."));
-            img.src = reader.result;
-        };
-
-        reader.onerror = () => reject(new Error("تعذر قراءة الصورة."));
-        reader.readAsDataURL(file);
-    });
-}
-
-
-function makeOCRCanvas(img, mode = "normal") {
-
-    const maxSide = 3000;
-    const longest = Math.max(img.naturalWidth, img.naturalHeight);
-    const scale = Math.min(1, maxSide / longest);
-
-    const canvas = document.createElement("canvas");
-    canvas.width = Math.max(1, Math.round(img.naturalWidth * scale));
-    canvas.height = Math.max(1, Math.round(img.naturalHeight * scale));
-
-    const ctx = canvas.getContext("2d", { alpha: false });
-    ctx.imageSmoothingEnabled = true;
-    ctx.imageSmoothingQuality = "high";
-
-    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-
-    if (mode === "normal") return canvas;
-
-    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-    const px = imageData.data;
-
-    for (let i = 0; i < px.length; i += 4) {
-
-        const r = px[i];
-        const g = px[i + 1];
-        const b = px[i + 2];
-
-        let gray =
-            0.299 * r +
-            0.587 * g +
-            0.114 * b;
-
-        if (mode === "contrast") {
-            gray = Math.max(0, Math.min(255, (gray - 128) * 1.65 + 128));
         }
+    );
+}
 
-        if (mode === "threshold") {
-            gray = gray > 165 ? 255 : 0;
+
+function fileToDataURL(file) {
+
+    return new Promise(
+        (resolve, reject) => {
+
+            const reader =
+                new FileReader();
+
+            reader.onload =
+                () =>
+                    resolve(
+                        reader.result
+                    );
+
+            reader.onerror =
+                () =>
+                    reject(
+                        new Error(
+                            "تعذر قراءة الصورة."
+                        )
+                    );
+
+            reader.readAsDataURL(
+                file
+            );
         }
-
-        px[i] = gray;
-        px[i + 1] = gray;
-        px[i + 2] = gray;
-    }
-
-    ctx.putImageData(imageData, 0, 0);
-
-    return canvas;
+    );
 }
 
 
-async function recognizeOCR(worker, image, label) {
+async function analyzeAddressWithAI(
+    image
+) {
 
-    const loading = document.getElementById("loading");
-    if (loading) loading.innerText = `⏳ ${label}`;
+    if (
+        !AI_BACKEND_URL
+    ) {
 
-    const result = await worker.recognize(image);
-
-    return {
-        text: String(result?.data?.text || "").trim(),
-        confidence: Number(result?.data?.confidence || 0)
-    };
-}
-
-
-function scoreOCR(text, confidence) {
-
-    let score = confidence;
-
-    if (/\b\d{5}\b/.test(text)) score += 35;
-    if (/\b(Göttingen|Goettingen|Berlin|Hamburg|München|Munich|Köln|Frankfurt)\b/i.test(text)) score += 10;
-    if (/\b(Herr|Frau)\b/i.test(text)) score += 4;
-    if (/\d+[a-zA-Z]?\s*$/m.test(text)) score += 12;
-    if (/Straße|Strasse|Str\.|Weg|Allee|Platz|Ring|Gasse/i.test(text)) score += 15;
-
-    return score;
-}
-
-
-async function scanDocumentLocally(file) {
-
-    const worker = await getOCRWorker();
-    const img = await loadImage(file);
-
-    // Two passes give a useful accuracy boost on photographed paper:
-    // a normal image and a contrast-enhanced image.
-    const canvases = [
-        makeOCRCanvas(img, "normal"),
-        makeOCRCanvas(img, "contrast")
-    ];
-
-    const results = [];
-
-    for (let i = 0; i < canvases.length; i++) {
-
-        const result = await recognizeOCR(
-            worker,
-            canvases[i],
-            i === 0
-                ? "جاري قراءة النص..."
-                : "جاري تحسين القراءة..."
-        );
-
-        if (result.text) results.push(result);
-    }
-
-    if (!results.length) {
         throw new Error(
-            "لم يتمكن OCR من قراءة النص. صوّر الورقة بشكل مستقيم وبإضاءة جيدة."
+            "عنوان خدمة AI غير مضبوط."
         );
     }
 
-    results.sort(
-        (a, b) => scoreOCR(b.text, b.confidence) - scoreOCR(a.text, a.confidence)
-    );
 
-    const best = results[0];
-    const parsed = parseAddressText(best.text);
+    const response =
+        await fetch(
+            AI_BACKEND_URL,
+            {
+                method: "POST",
 
-    // Try QR/barcode directly from the original photo as well.
-    try {
-        const code = await detectBarcodeFromImage(file);
-        if (code) parsed.barcode = code;
-    } catch (error) {
-        console.debug("Barcode image detection unavailable:", error);
-    }
+                headers: {
+                    "Content-Type":
+                        "application/json"
+                },
 
-    parsed.raw_text = best.text;
-    parsed.ocr_confidence = Math.round(best.confidence);
-
-    return parsed;
-}
-
-
-function parseAddressText(text) {
-
-    const clean = String(text || "")
-        .replace(/\r/g, "")
-        .replace(/[|]/g, " ")
-        .replace(/[\t]+/g, " ")
-        .replace(/ {2,}/g, " ");
-
-    const lines = clean
-        .split("\n")
-        .map(x => x.replace(/^[\s•·,;:]+|[\s•·,;:]+$/g, "").trim())
-        .filter(x => x.length >= 2);
-
-    const zipMatch = clean.match(/\b(\d{5})\b/);
-    const zip = zipMatch ? zipMatch[1] : "";
-
-    let city = "";
-    let zipLineIndex = -1;
-
-    if (zip) {
-
-        zipLineIndex = lines.findIndex(line => line.includes(zip));
-
-        const zipLine = zipLineIndex >= 0 ? lines[zipLineIndex] : "";
-        const afterZip = zipLine
-            .replace(zip, "")
-            .replace(/^[\s,.-]+/, "")
-            .trim();
-
-        if (afterZip && !/^\d+$/.test(afterZip)) {
-            city = normalizeGerman(afterZip);
-        }
-    }
-
-    // If the city is on the line after the PLZ, use it.
-    if (!city && zipLineIndex >= 0 && lines[zipLineIndex + 1]) {
-        const candidate = lines[zipLineIndex + 1].trim();
-        if (
-            candidate.length >= 2 &&
-            !/^(Datum|Date|Zeichen|Ihr|Ihre|Herr|Frau)\b/i.test(candidate)
-        ) {
-            city = normalizeGerman(candidate);
-        }
-    }
-
-    let street = "";
-    let house = "";
-    let streetIndex = -1;
-
-    // German street/address line: "St.-Heinrich-Straße 28", "Hauptstr. 12a", etc.
-    const streetRegex = /^(.+?)\s+(\d+[a-zA-Z]?\s*(?:[-/]\s*\d+[a-zA-Z]?)?)\s*$/;
-
-    for (let i = 0; i < lines.length; i++) {
-
-        const candidate = lines[i]
-            .replace(/^(Herr|Frau)\s+/i, "")
-            .trim();
-
-        const match = candidate.match(streetRegex);
-
-        if (!match) continue;
-
-        const possibleStreet = match[1].trim();
-
-        if (
-            /straße|strasse|str\.?\b|weg\b|allee\b|platz\b|ring\b|gasse\b|chaussee\b|ufer\b/i.test(possibleStreet) ||
-            /[.-]/.test(possibleStreet)
-        ) {
-            street = normalizeGerman(possibleStreet);
-            house = match[2].replace(/\s+/g, "").trim();
-            streetIndex = i;
-            break;
-        }
-    }
-
-    // Fallback: any line ending with a house number.
-    if (!street) {
-        for (let i = 0; i < lines.length; i++) {
-            const match = lines[i].match(streetRegex);
-            if (match) {
-                street = normalizeGerman(match[1]);
-                house = match[2].replace(/\s+/g, "");
-                streetIndex = i;
-                break;
+                body: JSON.stringify({
+                    image: image
+                })
             }
-        }
-    }
-
-    // Strong fallback for a PLZ + city embedded in the full OCR text.
-    if (!city && zip) {
-        const cityMatch = clean.match(new RegExp(
-            "\\b" + zip + "\\s+([A-Za-zÄÖÜäöüßÀ-ÿ][A-Za-zÄÖÜäöüßÀ-ÿ .-]{2,})"
-        ));
-        if (cityMatch) city = normalizeGerman(cityMatch[1]);
-    }
-
-    // Phone numbers.
-    const phoneMatch = clean.match(
-        /(?:\+49|0049|0)\s*(?:\(?\d{2,5}\)?[\s./-]*)\d[\d\s./-]{5,}\d/g
-    );
-
-    const phone = phoneMatch
-        ? phoneMatch[0].replace(/\s{2,}/g, " ").trim()
-        : "";
-
-    // The recipient is usually immediately before the street line.
-    let name = "";
-
-    if (streetIndex > 0) {
-
-        for (let i = streetIndex - 1; i >= 0; i--) {
-
-            let candidate = lines[i]
-                .replace(/^(Herr|Frau)\s*/i, "")
-                .trim();
-
-            if (!candidate) continue;
-
-            if (/^(STADT|FACHBEREICH|DATUM|ZEICHEN|IHR|IHRE|SEHR|BETREFF|AN|VON)\b/i.test(candidate)) {
-                continue;
-            }
-
-            if (/\d{5}/.test(candidate)) continue;
-
-            name = candidate;
-            break;
-        }
-    }
-
-    if (!name) {
-
-        const herrLine = lines.find(x => /^(Herr|Frau)\b/i.test(x));
-
-        if (herrLine) {
-            name = herrLine.replace(/^(Herr|Frau)\s*/i, "").trim();
-        }
-    }
-
-    // Remove obvious OCR noise from the name.
-    name = name.replace(/^[:;,.\-]+|[:;,.\-]+$/g, "").trim();
-
-    return {
-        name,
-        street,
-        house,
-        zip,
-        city,
-        phone,
-        barcode: "",
-        raw_text: clean
-    };
-}
+        );
 
 
-function normalizeGerman(value) {
+    if (!response.ok) {
 
-    return String(value || "")
-        .replace(/\bGoettingen\b/gi, "Göttingen")
-        .replace(/\bStrasse\b/gi, "Straße")
-        .replace(/\bStr\s*\.?\b/gi, "Str.")
-        .replace(/\s+/g, " ")
-        .trim();
-}
-
-
-async function detectBarcodeFromImage(file) {
-
-    // Native BarcodeDetector when available.
-    if ("BarcodeDetector" in window) {
+        let message =
+            "فشل الاتصال بالـAI.";
 
         try {
 
-            const supported = await BarcodeDetector.getSupportedFormats();
+            const data =
+                await response.json();
 
-            const preferred = [
-                "qr_code",
-                "code_128",
-                "code_39",
-                "code_93",
-                "ean_13",
-                "ean_8",
-                "itf",
-                "pdf417",
-                "data_matrix",
-                "aztec",
-                "upc_a",
-                "upc_e"
-            ];
+            message =
+                data.error ||
+                message;
 
-            const formats = preferred.filter(x => supported.includes(x));
+        } catch {}
 
-            if (formats.length) {
+        throw new Error(
+            message
+        );
+    }
 
-                const detector = new BarcodeDetector({ formats });
-                const bitmap = await createImageBitmap(file);
-                const codes = await detector.detect(bitmap);
 
-                if (bitmap.close) bitmap.close();
+    const data =
+        await response.json();
 
-                if (codes?.[0]?.rawValue) {
-                    return codes[0].rawValue;
-                }
-            }
 
-        } catch (error) {
-            console.debug("Native barcode detector failed:", error);
+    if (!data.success) {
+
+        throw new Error(
+            data.error ||
+            "فشل تحليل الصورة."
+        );
+    }
+
+
+    return data.data || {};
+}
+
+
+
+
+/* =====================================================
+   BATCH PARCEL IMPORT
+   Add one or many parcel images in one operation.
+   Each image may contain one parcel or several labels.
+===================================================== */
+
+function normalizeBatchParcel(item) {
+    if (!item || typeof item !== "object") return null;
+
+    const address =
+        item.address ||
+        item.fullAddress ||
+        [item.street || "", item.houseNumber || item.house || "", item.postalCode || item.zip || "", item.city || ""]
+            .filter(Boolean).join(" ").trim();
+
+    const parcel = {
+        id: Date.now() + Math.floor(Math.random() * 1000000),
+        name: String(item.name || item.recipientName || "").trim(),
+        street: String(item.street || "").trim(),
+        house: String(item.houseNumber || item.house || "").trim(),
+        zip: String(item.postalCode || item.zip || "").trim(),
+        city: String(item.city || "").trim(),
+        phone: String(item.phone || "").trim(),
+        barcode: String(item.trackingNumber || item.barcode || "").trim(),
+        notes: String(item.notes || "").trim(),
+        status: "pending",
+        proofUrl: null,
+        signatureUrl: null,
+        deliveredAt: null,
+        signatureAt: null,
+        lat: null,
+        lon: null,
+        routeOrder: null,
+        routeDistanceKm: null,
+        createdAt: new Date().toISOString()
+    };
+
+    // If Gemini returned only a combined address, preserve it in notes so it
+    // is not lost; the normal getAddress() function can still use the fields.
+    if (!parcel.street && address) parcel.notes = parcel.notes || address;
+
+    if (!parcel.street && !parcel.city && !parcel.name && !address) return null;
+    return parcel;
+}
+
+async function analyzeBatchImage(file) {
+    const image = await fileToDataURL(file);
+
+    const response = await fetch(
+        AI_BACKEND_URL + "/analyze-image",
+        {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                image,
+                mimeType: file.type || "image/jpeg",
+                prompt: `
+حلل صورة تحتوي على ملصق واحد أو عدة ملصقات طرود.
+استخرج جميع الطرود الظاهرة في الصورة، وليس أول طرد فقط.
+أعد JSON فقط بهذا الشكل:
+{
+  "packages": [
+    {
+      "name": "",
+      "address": "",
+      "street": "",
+      "houseNumber": "",
+      "postalCode": "",
+      "city": "",
+      "phone": "",
+      "trackingNumber": "",
+      "notes": ""
+    }
+  ]
+}
+إذا كانت الصورة تحتوي على طرد واحد، يجب أن يكون packages مصفوفة تحتوي على طرد واحد.
+لا تخمن البيانات. إذا لم تكن قيمة واضحة اتركها فارغة.
+                `.trim()
+            })
+        }
+    );
+
+    let data = {};
+    const rawText = await response.text();
+
+    try {
+        data = rawText ? JSON.parse(rawText) : {};
+    } catch (e) {
+        throw new Error("استجابة الـAI ليست JSON صحيحة.");
+    }
+
+    if (!response.ok || !data.success) {
+        throw new Error(
+            data.error ||
+            data.message ||
+            `فشل تحليل الصورة (HTTP ${response.status})`
+        );
+    }
+
+    /*
+      The Worker can return the AI result in several valid shapes.
+      Accept all of them so batch import does not silently become 0/0.
+    */
+    let packages = [];
+
+    const candidates = [
+        data?.data?.packages,
+        data?.data?.parcels,
+        data?.packages,
+        data?.parcels,
+        data?.result?.packages,
+        data?.result?.parcels
+    ];
+
+    for (const candidate of candidates) {
+        if (Array.isArray(candidate)) {
+            packages = candidate;
+            break;
         }
     }
 
-    // QR fallback for browsers without BarcodeDetector.
-    try {
-
-        const jsQR = await loadJsQR();
-        const img = await loadImage(file);
-        const canvas = makeOCRCanvas(img, "normal");
-        const ctx = canvas.getContext("2d", { willReadFrequently: true });
-        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-        const code = jsQR(imageData.data, imageData.width, imageData.height, {
-            inversionAttempts: "attemptBoth"
-        });
-
-        if (code?.data) return code.data;
-
-    } catch (error) {
-        console.debug("QR fallback failed:", error);
+    // data.data itself may already be an array.
+    if (!packages.length && Array.isArray(data?.data)) {
+        packages = data.data;
     }
 
-    return "";
+    // The AI may return one parcel object instead of packages[].
+    if (
+        !packages.length &&
+        data?.data &&
+        typeof data.data === "object" &&
+        !Array.isArray(data.data)
+    ) {
+        const one = data.data;
+
+        if (
+            one.address ||
+            one.fullAddress ||
+            one.street ||
+            one.houseNumber ||
+            one.postalCode ||
+            one.city ||
+            one.recipientName ||
+            one.name ||
+            one.trackingNumber ||
+            one.barcode
+        ) {
+            packages = [one];
+        }
+    }
+
+    // Some Worker versions return the AI JSON as text.
+    const textCandidates = [
+        data?.text,
+        data?.data?.text,
+        data?.rawText
+    ].filter(v => typeof v === "string" && v.trim());
+
+    if (!packages.length && textCandidates.length) {
+        for (const text of textCandidates) {
+            try {
+                const clean = text
+                    .replace(/```json/gi, "")
+                    .replace(/```/g, "")
+                    .trim();
+
+                let parsed = null;
+
+                try {
+                    parsed = JSON.parse(clean);
+                } catch {
+                    const a = clean.indexOf("{");
+                    const b = clean.lastIndexOf("}");
+                    if (a >= 0 && b > a) {
+                        parsed = JSON.parse(clean.slice(a, b + 1));
+                    }
+                }
+
+                if (Array.isArray(parsed)) {
+                    packages = parsed;
+                    break;
+                }
+
+                if (parsed?.packages && Array.isArray(parsed.packages)) {
+                    packages = parsed.packages;
+                    break;
+                }
+
+                if (parsed?.parcels && Array.isArray(parsed.parcels)) {
+                    packages = parsed.parcels;
+                    break;
+                }
+
+                if (
+                    parsed &&
+                    typeof parsed === "object" &&
+                    (
+                        parsed.address ||
+                        parsed.street ||
+                        parsed.city ||
+                        parsed.name ||
+                        parsed.recipientName
+                    )
+                ) {
+                    packages = [parsed];
+                    break;
+                }
+            } catch {
+                // Try the next possible text field.
+            }
+        }
+    }
+
+    /*
+      Never silently return 0 when the Worker actually returned a
+      successful AI response. Throw a useful error instead so the user
+      knows exactly which image failed.
+    */
+    if (!packages.length) {
+        console.error("Batch AI returned no parcels:", data);
+
+        throw new Error(
+            "الـAI أنهى تحليل الصورة لكنه لم يرجع أي طرود. " +
+            "تحقق من استجابة Worker /analyze-image."
+        );
+    }
+
+    return packages;
+}
+
+function parcelDedupKey(p) {
+    const tracking = String(p.barcode || "").replace(/\s+/g, "").toLowerCase();
+    if (tracking) return "tracking:" + tracking;
+    return [p.street, p.house, p.zip, p.city, p.name]
+        .map(v => String(v || "").trim().toLowerCase())
+        .join("|");
+}
+
+async function importAllParcelsBatch(files) {
+    if (!files || !files.length) return;
+
+    const batchBtn = document.getElementById("batchImportBtn");
+    if (batchBtn) batchBtn.disabled = true;
+    showLoading(true);
+
+    const detected = [];
+
+    try {
+        for (let i = 0; i < files.length; i++) {
+            const file = files[i];
+            document.getElementById("loading").textContent =
+                `🤖 قراءة الطرود ${i + 1}/${files.length}...`;
+
+            const items = await analyzeBatchImage(file);
+            detected.push(...items);
+        }
+
+        const existingKeys = new Set(parcels.map(parcelDedupKey));
+        const added = [];
+        const seen = new Set();
+        let invalid = 0;
+        let duplicates = 0;
+
+        for (const item of detected) {
+            const p = normalizeBatchParcel(item);
+
+            if (!p) {
+                invalid++;
+                continue;
+            }
+
+            const key = parcelDedupKey(p);
+
+            if (!key || seen.has(key) || existingKeys.has(key)) {
+                duplicates++;
+                continue;
+            }
+
+            seen.add(key);
+            added.push(p);
+        }
+
+        if (added.length) {
+            parcels.push(...added);
+            saveAndSync();
+        }
+
+        // Show the normal parcel list immediately.
+        showParcelView("all");
+
+        alert(
+            `تمت إضافة ${added.length} طرد من أصل ${detected.length} طرد مقروء.` +
+            `\nالمكرر: ${duplicates}` +
+            `\nالبيانات غير الكافية: ${invalid}`
+        );
+
+    } catch (error) {
+        console.error(error);
+        alert("تعذر إضافة الطرود دفعة واحدة:\n\n" + (error.message || error));
+    } finally {
+        showLoading(false);
+        if (batchBtn) batchBtn.disabled = false;
+    }
 }
 
 
-function loadJsQR() {
+let batchCameraStream = null;
+let batchCapturedFiles = [];
 
-    if (window.jsQR) return Promise.resolve(window.jsQR);
+function updateBatchCameraUI() {
+    const count = document.getElementById("batchPhotoCount");
+    const thumbs = document.getElementById("batchThumbs");
+    if (count) count.textContent = `تم التقاط ${batchCapturedFiles.length} صورة`;
 
-    return new Promise((resolve, reject) => {
-
-        const script = document.createElement("script");
-        script.src = "https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js";
-        script.async = true;
-        script.onload = () => resolve(window.jsQR);
-        script.onerror = () => reject(new Error("تعذر تحميل قارئ QR."));
-        document.head.appendChild(script);
-    });
+    if (thumbs) {
+        thumbs.innerHTML = "";
+        batchCapturedFiles.forEach(file => {
+            const img = document.createElement("img");
+            img.src = URL.createObjectURL(file);
+            thumbs.appendChild(img);
+        });
+    }
 }
+
+function stopBatchCamera() {
+    if (batchCameraStream) {
+        batchCameraStream.getTracks().forEach(track => track.stop());
+        batchCameraStream = null;
+    }
+    const video = document.getElementById("batchCameraVideo");
+    if (video) video.srcObject = null;
+}
+
+async function openBatchCamera() {
+    const modal = document.getElementById("batchCameraModal");
+    const video = document.getElementById("batchCameraVideo");
+    const status = document.getElementById("batchCameraStatus");
+
+    if (!modal || !video) return;
+
+    batchCapturedFiles = [];
+    updateBatchCameraUI();
+    modal.classList.add("show");
+    modal.setAttribute("aria-hidden", "false");
+
+    try {
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+            throw new Error("الكاميرا المباشرة غير مدعومة في هذا المتصفح.");
+        }
+
+        batchCameraStream = await navigator.mediaDevices.getUserMedia({
+            video: {
+                facingMode: { ideal: "environment" },
+                width: { ideal: 1920 },
+                height: { ideal: 1080 }
+            },
+            audio: false
+        });
+
+        video.srcObject = batchCameraStream;
+        await video.play();
+
+        if (status) {
+            status.textContent = "الكاميرا جاهزة — صوّر كل طرد ثم اضغط إنهاء وتحليل.";
+        }
+
+    } catch (error) {
+        console.error(error);
+
+        if (status) {
+            status.textContent =
+                "تعذر فتح الكاميرا مباشرة. يمكنك اختيار الصور من الجهاز.";
+        }
+    }
+}
+
+function closeBatchCamera() {
+    stopBatchCamera();
+
+    const modal = document.getElementById("batchCameraModal");
+    if (modal) {
+        modal.classList.remove("show");
+        modal.setAttribute("aria-hidden", "true");
+    }
+}
+
+async function captureBatchParcelPhoto() {
+    const video = document.getElementById("batchCameraVideo");
+    const status = document.getElementById("batchCameraStatus");
+
+    if (!video || !video.videoWidth || !video.videoHeight) {
+        alert("الكاميرا لم تصبح جاهزة بعد.");
+        return;
+    }
+
+    const canvas = document.createElement("canvas");
+
+    // Keep the image large enough for address recognition but avoid enormous uploads.
+    const maxWidth = 1600;
+    const scale = Math.min(1, maxWidth / video.videoWidth);
+
+    canvas.width = Math.round(video.videoWidth * scale);
+    canvas.height = Math.round(video.videoHeight * scale);
+
+    const ctx = canvas.getContext("2d", { alpha: false });
+
+    ctx.drawImage(
+        video,
+        0,
+        0,
+        canvas.width,
+        canvas.height
+    );
+
+    const blob = await new Promise(resolve =>
+        canvas.toBlob(resolve, "image/jpeg", 0.88)
+    );
+
+    if (!blob) {
+        alert("تعذر حفظ الصورة.");
+        return;
+    }
+
+    const file = new File(
+        [blob],
+        `parcel-${Date.now()}-${batchCapturedFiles.length + 1}.jpg`,
+        { type: "image/jpeg" }
+    );
+
+    batchCapturedFiles.push(file);
+    updateBatchCameraUI();
+
+    if (status) {
+        status.textContent =
+            `تم تصوير الطرد ${batchCapturedFiles.length}. يمكنك تصوير الطرد التالي.`;
+    }
+}
+
+async function finishBatchCamera() {
+    if (!batchCapturedFiles.length) {
+        alert("لم يتم تصوير أي طرد.");
+        return;
+    }
+
+    const files = [...batchCapturedFiles];
+
+    closeBatchCamera();
+
+    await importAllParcelsBatch(files);
+}
+
+function initBatchImport() {
+    const button = document.getElementById("batchImportBtn");
+    const galleryInput = document.getElementById("batchGalleryInput");
+
+    if (!button) return;
+
+    // Main button opens the continuous camera.
+    if (!button.dataset.batchBound) {
+        button.addEventListener("click", openBatchCamera);
+        button.dataset.batchBound = "1";
+    }
+
+    const captureBtn =
+        document.getElementById("batchCaptureBtn");
+
+    const finishBtn =
+        document.getElementById("batchFinishBtn");
+
+    const closeBtn =
+        document.getElementById("batchCameraCloseBtn");
+
+    const galleryBtn =
+        document.getElementById("batchGalleryBtn");
+
+    if (captureBtn && !captureBtn.dataset.batchBound) {
+        captureBtn.addEventListener(
+            "click",
+            captureBatchParcelPhoto
+        );
+        captureBtn.dataset.batchBound = "1";
+    }
+
+    if (finishBtn && !finishBtn.dataset.batchBound) {
+        finishBtn.addEventListener(
+            "click",
+            finishBatchCamera
+        );
+        finishBtn.dataset.batchBound = "1";
+    }
+
+    if (closeBtn && !closeBtn.dataset.batchBound) {
+        closeBtn.addEventListener(
+            "click",
+            closeBatchCamera
+        );
+        closeBtn.dataset.batchBound = "1";
+    }
+
+    if (galleryBtn && galleryInput && !galleryBtn.dataset.batchBound) {
+        galleryBtn.addEventListener(
+            "click",
+            () => galleryInput.click()
+        );
+        galleryBtn.dataset.batchBound = "1";
+
+        galleryInput.addEventListener(
+            "change",
+            async event => {
+                const files =
+                    Array.from(
+                        event.target.files || []
+                    );
+
+                event.target.value = "";
+
+                if (!files.length) return;
+
+                closeBatchCamera();
+                await importAllParcelsBatch(files);
+            }
+        );
+    }
+
+    // Keep the old hidden batch input as a fallback if it exists.
+    const oldInput =
+        document.getElementById("batchImportInput");
+
+    if (oldInput) {
+        oldInput.addEventListener(
+            "change",
+            async event => {
+                const files =
+                    Array.from(
+                        event.target.files || []
+                    );
+
+                event.target.value = "";
+
+                if (files.length) {
+                    await importAllParcelsBatch(files);
+                }
+            }
+        );
+    }
+}
+
+document.addEventListener("DOMContentLoaded", function () {
+    initBatchImport();
+});
+window.addEventListener("load", function () {
+    // Rebind only if the modal exists and the main button has not been bound.
+    const btn = document.getElementById("batchImportBtn");
+    if (btn && !btn.dataset.batchBound) {
+        initBatchImport();
+    }
+});
 
 
 /* =====================================================
    OPEN PARCEL FORM
 ===================================================== */
-
 
 function openParcelForm(
     data = {}
@@ -1914,7 +2225,7 @@ function openParcelForm(
     document.getElementById(
         "fNotes"
     ).value =
-        data.notes || "";
+        data.raw_text || "";
 
 
     document.getElementById(
@@ -1926,7 +2237,11 @@ function openParcelForm(
 
 
 function saveParcelForm() {
-    normalizeParcelFormFields();
+    // Normalize only form input text before saving.
+    ["fName","fStreet","fHouse","fZip","fCity","fPhone","fBarcode","fNotes"].forEach(function(id) {
+        const el = document.getElementById(id);
+        if (el) el.value = cleanFormText(el.value);
+    });
 
 
     const index =
@@ -1990,6 +2305,46 @@ function saveParcelForm() {
         proofUrl:
             index !== ""
                 ? parcels[index].proofUrl
+                : null,
+
+        createdAt:
+            index !== ""
+                ? (parcels[index].createdAt || new Date().toISOString())
+                : new Date().toISOString(),
+
+        deliveredAt:
+            index !== ""
+                ? parcels[index].deliveredAt || null
+                : null,
+
+        signatureUrl:
+            index !== ""
+                ? parcels[index].signatureUrl || null
+                : null,
+
+        signatureAt:
+            index !== ""
+                ? parcels[index].signatureAt || null
+                : null,
+
+        lat:
+            index !== ""
+                ? parcels[index].lat ?? null
+                : null,
+
+        lon:
+            index !== ""
+                ? parcels[index].lon ?? null
+                : null,
+
+        routeOrder:
+            index !== ""
+                ? parcels[index].routeOrder ?? null
+                : null,
+
+        routeDistanceKm:
+            index !== ""
+                ? parcels[index].routeDistanceKm ?? null
                 : null
     };
 
@@ -2135,36 +2490,29 @@ function initTracker() {
 }
 
 
-function haversineDistanceKm(lat1, lon1, lat2, lon2) {
-    const aLat = Number(lat1);
-    const aLon = Number(lon1);
-    const bLat = Number(lat2);
-    const bLon = Number(lon2);
+function calculateDistance(lat1, lon1, lat2, lon2) {
+    const aLat = Number(lat1), aLon = Number(lon1);
+    const bLat = Number(lat2), bLon = Number(lon2);
 
-    // Reject invalid coordinates before doing any math.
     if (
         !Number.isFinite(aLat) || !Number.isFinite(aLon) ||
         !Number.isFinite(bLat) || !Number.isFinite(bLon) ||
         Math.abs(aLat) > 90 || Math.abs(bLat) > 90 ||
         Math.abs(aLon) > 180 || Math.abs(bLon) > 180
-    ) {
-        return NaN;
-    }
+    ) return Infinity;
 
-    const toRad = deg => deg * Math.PI / 180;
-    const dLat = toRad(bLat - aLat);
-    const dLon = toRad(bLon - aLon);
+    const R = 6371;
+    const rad = Math.PI / 180;
+    const dLat = (bLat - aLat) * rad;
+    const dLon = (bLon - aLon) * rad;
 
-    const sinLat = Math.sin(dLat / 2);
-    const sinLon = Math.sin(dLon / 2);
+    const a =
+        Math.sin(dLat / 2) ** 2 +
+        Math.cos(aLat * rad) *
+        Math.cos(bLat * rad) *
+        Math.sin(dLon / 2) ** 2;
 
-    const h =
-        sinLat * sinLat +
-        Math.cos(toRad(aLat)) *
-        Math.cos(toRad(bLat)) *
-        sinLon * sinLon;
-
-    return 6371 * 2 * Math.atan2(Math.sqrt(h), Math.sqrt(1 - h));
+    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
 
@@ -2178,18 +2526,214 @@ function deg2rad(deg) {
 
 
 /* =====================================================
-   LOCAL OCR / CAMERA
+   LOCAL OCR
 ===================================================== */
+
+async function loadTesseractScript() {
+
+    if (
+        window.Tesseract
+    ) {
+
+        return window.Tesseract;
+    }
+
+
+    return new Promise(
+        (resolve, reject) => {
+
+            const script =
+                document.createElement(
+                    "script"
+                );
+
+            script.src =
+                "https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js";
+
+            script.onload =
+                () =>
+                    resolve(
+                        window.Tesseract
+                    );
+
+            script.onerror =
+                reject;
+
+            document.head.appendChild(
+                script
+            );
+        }
+    );
+}
+
 
 async function processImage(event) {
 
-    const file = event.target.files?.[0];
-    event.target.value = "";
+    const file =
+        event.target.files?.[0];
 
-    if (!file) return;
+    if (!file)
+        return;
 
-    const button = document.getElementById("aiScanBtn");
-    await runLocalDocumentScan(file, button || { disabled:false, innerText:"" });
+
+    showLoading(true);
+
+
+    try {
+
+        const TesseractLib =
+            await loadTesseractScript();
+
+
+        const result =
+            await TesseractLib.recognize(
+                file,
+                "eng+deu"
+            );
+
+
+        const text =
+            result.data.text.trim();
+
+
+        const parsed =
+            parseAddressText(
+                text
+            );
+
+
+        openParcelForm(
+            parsed
+        );
+
+
+    } catch(error) {
+
+        console.error(error);
+
+        alert(
+            "خطأ بقراءة الصورة."
+        );
+
+    } finally {
+
+        showLoading(false);
+
+        event.target.value = "";
+    }
+}
+
+
+function parseAddressText(
+    text
+) {
+
+    const lines =
+        text
+            .split(/\r?\n/)
+            .map(
+                x => x.trim()
+            )
+            .filter(
+                x =>
+                    x.length > 2
+            );
+
+
+    const zipMatch =
+        text.match(
+            /\b\d{5}\b/
+        );
+
+
+    const zip =
+        zipMatch
+            ? zipMatch[0]
+            : "";
+
+
+    let street = "";
+    let house = "";
+
+
+    for (
+        const line
+        of lines
+    ) {
+
+        const match =
+            line.match(
+                /^(.+?)\s+(\d+[a-zA-Z]?(?:-\d+[a-zA-Z]?)?)$/
+            );
+
+
+        if (match) {
+
+            street =
+                match[1].trim();
+
+            house =
+                match[2].trim();
+
+            break;
+        }
+    }
+
+
+    let city = "";
+
+
+    if (zip) {
+
+        const afterZip =
+            text
+                .slice(
+                    text.indexOf(zip) + 5
+                )
+                .split(/\r?\n/)
+                .map(
+                    x =>
+                        x.trim()
+                )
+                .filter(Boolean);
+
+
+        city =
+            afterZip[0] || "";
+    }
+
+
+    const phoneMatch =
+        text.match(
+            /(?:\+49|0049|0)\s?[\d\s()/.-]{8,}/
+        );
+
+
+    return {
+
+        name:
+            lines[1] ||
+            lines[0] ||
+            "",
+
+        street,
+
+        house,
+
+        zip,
+
+        city,
+
+        phone:
+            phoneMatch
+                ? phoneMatch[0].trim()
+                : "",
+
+        barcode: "",
+
+        raw_text:
+            text
+    };
 }
 
 
@@ -2217,6 +2761,11 @@ async function pasteFromClipboard() {
                     text.trim()
                 );
 
+            // Pasted text is address data only for a new parcel.
+            // Keep Notes empty; do not store the original clipboard blob.
+            if (parsed && typeof parsed === "object") {
+                parsed.notes = "";
+            }
 
             openParcelForm(
                 parsed
@@ -2306,248 +2855,144 @@ function startVoiceInput() {
 
 async function scanBarcode() {
 
-    // First try native BarcodeDetector for a fast scanner.
-    if ("BarcodeDetector" in window) {
+    if (
+        !("BarcodeDetector" in window)
+    ) {
 
-        try {
-
-            const supported = await BarcodeDetector.getSupportedFormats();
-
-            const preferred = [
-                "qr_code",
-                "code_128",
-                "code_39",
-                "code_93",
-                "ean_13",
-                "ean_8",
-                "itf",
-                "pdf417",
-                "data_matrix",
-                "aztec",
-                "upc_a",
-                "upc_e"
-            ];
-
-            const formats = preferred.filter(x => supported.includes(x));
-
-            if (formats.length) {
-                await scanBarcodeNative(formats);
-                return;
-            }
-
-        } catch (error) {
-            console.debug("Native barcode scanner unavailable:", error);
-        }
-    }
-
-    // Multi-format fallback for iPhone/Safari and browsers without BarcodeDetector.
-    try {
-        await scanBarcodeWithZXing();
-    } catch (error) {
         alert(
-            "تعذر تشغيل قارئ QR/Barcode.\n\n" +
-            (error?.message || "تأكد من السماح بالكاميرا والاتصال بالإنترنت.")
+            "BarcodeDetector غير مدعوم في هذا المتصفح. استخدم Chrome حديث."
         );
-    }
-}
 
-
-async function scanBarcodeNative(formats) {
-
-    const stream = await navigator.mediaDevices.getUserMedia({
-        video: {
-            facingMode: { ideal: "environment" },
-            width: { ideal: 1920 },
-            height: { ideal: 1080 }
-        }
-    });
-
-    const video = document.createElement("video");
-
-    Object.assign(video.style, {
-        position: "fixed",
-        inset: "0",
-        width: "100%",
-        height: "100%",
-        objectFit: "cover",
-        zIndex: "9999",
-        background: "#000"
-    });
-
-    video.autoplay = true;
-    video.playsInline = true;
-    video.muted = true;
-    video.srcObject = stream;
-
-    const hint = document.createElement("div");
-    hint.innerText = "وجّه الكاميرا إلى QR / Barcode — اضغط للرجوع";
-    Object.assign(hint.style, {
-        position: "fixed",
-        top: "20px",
-        left: "15px",
-        right: "15px",
-        zIndex: "10000",
-        color: "white",
-        background: "rgba(0,0,0,.65)",
-        padding: "12px",
-        borderRadius: "10px",
-        textAlign: "center",
-        fontWeight: "bold"
-    });
-
-    document.body.appendChild(video);
-    document.body.appendChild(hint);
-
-    const close = () => {
-        stream.getTracks().forEach(track => track.stop());
-        video.remove();
-        hint.remove();
-    };
-
-    hint.addEventListener("click", close);
-
-    await video.play().catch(() => {});
-
-    const detector = new BarcodeDetector({ formats });
-    let stopped = false;
-
-    const scan = async () => {
-
-        if (stopped) return;
-
-        try {
-            const codes = await detector.detect(video);
-
-            if (codes?.length) {
-                stopped = true;
-                const value = codes[0].rawValue || "";
-                close();
-                openParcelForm({ barcode: value });
-                return;
-            }
-        } catch (_) {}
-
-        requestAnimationFrame(scan);
-    };
-
-    scan();
-}
-
-
-async function loadZXing() {
-
-    if (window.ZXingBrowser) return window.ZXingBrowser;
-    if (zxingPromise) return zxingPromise;
-
-    zxingPromise = new Promise((resolve, reject) => {
-
-        const script = document.createElement("script");
-        script.src = "https://unpkg.com/@zxing/browser@0.2.1";
-        script.async = true;
-
-        script.onload = () => {
-            if (window.ZXingBrowser) resolve(window.ZXingBrowser);
-            else reject(new Error("لم يتم تحميل ZXing."));
-        };
-
-        script.onerror = () => reject(new Error("تعذر تحميل قارئ Barcode."));
-        document.head.appendChild(script);
-    });
-
-    return zxingPromise;
-}
-
-
-async function scanBarcodeWithZXing() {
-
-    const ZXing = await loadZXing();
-
-    const Reader = ZXing.BrowserMultiFormatReader;
-
-    if (!Reader) {
-        throw new Error("قارئ Barcode متعدد الصيغ غير متاح.");
+        return;
     }
 
-    const reader = new Reader();
-
-    const video = document.createElement("video");
-    Object.assign(video.style, {
-        position: "fixed",
-        inset: "0",
-        width: "100%",
-        height: "100%",
-        objectFit: "cover",
-        zIndex: "9999",
-        background: "#000"
-    });
-    video.autoplay = true;
-    video.playsInline = true;
-    video.muted = true;
-
-    const hint = document.createElement("div");
-    hint.innerText = "وجّه الكاميرا إلى QR / Barcode — اضغط هنا للإغلاق";
-    Object.assign(hint.style, {
-        position: "fixed",
-        top: "20px",
-        left: "15px",
-        right: "15px",
-        zIndex: "10000",
-        color: "white",
-        background: "rgba(0,0,0,.65)",
-        padding: "12px",
-        borderRadius: "10px",
-        textAlign: "center",
-        fontWeight: "bold"
-    });
-
-    document.body.appendChild(video);
-    document.body.appendChild(hint);
-
-    let controls = null;
-    let closed = false;
-
-    const close = () => {
-        if (closed) return;
-        closed = true;
-        try { controls?.stop?.(); } catch (_) {}
-        try { reader.reset?.(); } catch (_) {}
-        video.srcObject?.getTracks?.().forEach(track => track.stop());
-        video.remove();
-        hint.remove();
-    };
-
-    hint.addEventListener("click", close);
 
     try {
 
-        controls = await reader.decodeFromConstraints(
-            {
-                video: {
-                    facingMode: { ideal: "environment" },
-                    width: { ideal: 1920 },
-                    height: { ideal: 1080 }
-                }
-            },
-            video,
-            (result) => {
+        const stream =
+            await navigator
+                .mediaDevices
+                .getUserMedia({
+                    video: {
+                        facingMode:
+                            "environment"
+                    }
+                });
 
-                if (!result || closed) return;
 
-                const value =
-                    result.getText?.() ||
-                    result.text ||
-                    "";
+        const video =
+            document.createElement(
+                "video"
+            );
 
-                if (!value) return;
 
-                close();
-                openParcelForm({ barcode: value });
-            }
+        video.style.position =
+            "fixed";
+
+        video.style.inset =
+            "0";
+
+        video.style.width =
+            "100%";
+
+        video.style.height =
+            "100%";
+
+        video.style.objectFit =
+            "cover";
+
+        video.style.zIndex =
+            "9999";
+
+        video.autoplay =
+            true;
+
+        video.playsInline =
+            true;
+
+        document.body.appendChild(
+            video
         );
 
-    } catch (error) {
-        close();
-        throw error;
+
+        video.srcObject =
+            stream;
+
+
+        const detector =
+            new BarcodeDetector({
+                formats: [
+                    "qr_code",
+                    "code_128",
+                    "ean_13",
+                    "ean_8",
+                    "pdf417",
+                    "data_matrix",
+                    "aztec",
+                    "upc_a",
+                    "upc_e"
+                ]
+            });
+
+
+        const scan =
+            async () => {
+
+                try {
+
+                    const codes =
+                        await detector.detect(
+                            video
+                        );
+
+
+                    if (
+                        codes.length
+                    ) {
+
+                        const value =
+                            codes[0]
+                                .rawValue;
+
+
+                        stream
+                            .getTracks()
+                            .forEach(
+                                track =>
+                                    track.stop()
+                            );
+
+
+                        video.remove();
+
+
+                        openParcelForm({
+                            barcode:
+                                value
+                        });
+
+
+                        return;
+                    }
+
+                } catch {}
+
+
+                requestAnimationFrame(
+                    scan
+                );
+            };
+
+
+        scan();
+
+
+    } catch(error) {
+
+        alert(
+            "تعذر فتح الكاميرا: " +
+            error.message
+        );
     }
 }
 
@@ -2967,6 +3412,8 @@ function updateUI() {
                             ? `
                                 <button
                                     class="action-btn deliver-btn"
+                                    data-parcel-action="deliver"
+                                    data-parcel-index="${index}"
                                     onclick="markDelivered(${index})"
                                 >
                                     ✅ تسليم
@@ -2982,6 +3429,8 @@ function updateUI() {
                             ? `
                                 <button
                                     class="action-btn absent-btn"
+                                    data-parcel-action="absent"
+                                    data-parcel-index="${index}"
                                     onclick="markAbsent(${index})"
                                 >
                                     🏠 غياب
@@ -2993,6 +3442,8 @@ function updateUI() {
 
                     <button
                         class="action-btn proof-btn"
+                        data-parcel-action="proof"
+                        data-parcel-index="${index}"
                         onclick="takeProof(${index})"
                     >
                         📸 صورة
@@ -3039,16 +3490,26 @@ function markDelivered(
     index
 ) {
 
-    parcels[index].status =
-        "delivered";
+    const parcel = parcels[index];
+    if (!parcel) return;
 
+    parcel.status = "delivered";
+    parcel.deliveredAt = new Date().toISOString();
 
-    parcels[index].deliveredAt =
-        new Date()
-            .toISOString();
-
+    // Save the current GPS position when available.
+    if (Number.isFinite(Number(lastLat)) && Number.isFinite(Number(lastLon))) {
+        parcel.deliveryLat = Number(lastLat);
+        parcel.deliveryLon = Number(lastLon);
+    }
 
     saveAndSync();
+
+    // Keep the user on the same page and show a clear confirmation.
+    setTimeout(() => {
+        try {
+            alert("تم تأكيد تسليم الطرد وحفظه في History.");
+        } catch (_) {}
+    }, 0);
 }
 
 
@@ -3460,7 +3921,7 @@ ${remaining}
 ${success}%
 
 🚶‍♂️ المسافة:
-${formatRouteDistance(totalDistance)}
+${totalDistance.toFixed(2)} كم
 
 --------------------------------
 
@@ -3569,27 +4030,299 @@ window.addEventListener(
 updateConnection();
 
 
-    // Modern live clock/date.
+
+/* =====================================================
+   STABLE PARCEL VIEWS — DOES NOT TOUCH parcelsList
+   ===================================================== */
+
+function parcelDate(parcel) {
+    return parcel.createdAt || parcel.deliveredAt || null;
+}
+
+function isParcelToday(parcel) {
+    const raw = parcelDate(parcel);
+    if (!raw) return false;
+    const d = new Date(raw);
+    if (Number.isNaN(d.getTime())) return false;
+    const n = new Date();
+    return d.getFullYear() === n.getFullYear() &&
+           d.getMonth() === n.getMonth() &&
+           d.getDate() === n.getDate();
+}
+
+function phoneForWhatsApp(phone) {
+    let p = String(phone || '').replace(/[^\d+]/g,'');
+    if (p.startsWith('00')) p = '+' + p.slice(2);
+    if (p.startsWith('0')) p = '+49' + p.slice(1);
+    return p.replace(/\D/g,'');
+}
+
+function parcelStatusHTML(parcel) {
+    if (parcel.status === 'delivered') return '<span class="status-badge status-delivered">✓ تم التسليم</span>';
+    if (parcel.status === 'absent') return '<span class="status-badge status-absent">✕ غياب</span>';
+    if (parcel.status === 'reattempt') return '<span class="status-badge status-reattempt">🔄 إعادة</span>';
+    return '<span class="status-badge">قيد الانتظار</span>';
+}
+
+function renderFilteredParcel(parcel, index) {
+    const address = getAddress(parcel);
+    const phone = parcel.phone || '';
+    const wa = phoneForWhatsApp(phone);
+    return `
+        <div class="filter-card">
+            <div class="parcel-info">
+                <span>📦 #${index + 1}${parcel.barcode ? ' · ' + escapeHTML(parcel.barcode) : ''}</span>
+                ${parcelStatusHTML(parcel)}
+            </div>
+            <div class="parcel-info">👤 ${escapeHTML(parcel.name || 'بدون اسم')}</div>
+            <div class="address-box">📍 ${escapeHTML(address)}</div>
+            ${parcel.routeOrder ? `<div class="route-mini">🔢 ترتيب المسار: ${parcel.routeOrder} · 📏 ${Number(parcel.routeDistanceKm || 0).toFixed(2)} كم</div>` : ''}
+            ${parcel.deliveredAt ? `<div class="parcel-fields">🕐 تم التسليم: ${new Date(parcel.deliveredAt).toLocaleString('de-DE')}</div>` : ''}
+            ${parcel.notes ? `<div class="parcel-fields">📝 ${escapeHTML(parcel.notes)}</div>` : ''}
+            <div class="btn-group">
+                <button class="action-btn map-btn" data-parcel-action="navigation" data-parcel-index="${index}" onclick="openParcelNavigation(${index})">🧭 ملاحة</button>
+                ${phone ? `<a class="action-btn wa-btn" target="_blank" href="https://wa.me/${wa}">💬 WhatsApp</a>` : ''}
+                ${phone ? `<a class="action-btn" style="background:#2563eb" href="tel:${escapeHTML(phone)}">📞 اتصال</a>` : ''}
+                ${parcel.status !== 'delivered' ? `<button class="action-btn deliver-btn" data-parcel-action="deliver" data-parcel-index="${index}" onclick="markDelivered(${index})">✅ تسليم</button>` : ''}
+                <button class="action-btn proof-btn" data-parcel-action="proof" data-parcel-index="${index}" onclick="takeProof(${index})">📸 صورة</button>
+                <button class="action-btn" style="background:#9333ea" data-parcel-action="signature" data-parcel-index="${index}" onclick="openSignature(${index})">✍️ توقيع</button>
+                <button class="action-btn edit-btn" data-parcel-action="edit" data-parcel-index="${index}" onclick="editParcel(${index})">✏️ تعديل</button>
+            </div>
+            ${parcel.proofUrl ? `<div style="margin-top:6px"><b>📸 صورة التسليم</b><img class="proof-img" src="${escapeHTML(parcel.proofUrl)}"></div>` : ''}
+            ${parcel.signatureUrl ? `<div style="margin-top:6px"><b>✍️ توقيع المستلم</b><img class="proof-img" src="${escapeHTML(parcel.signatureUrl)}"></div>` : ''}
+            ${parcel.status === 'delivered' && phone ? `<button class="action-main-btn" style="background:#16a34a;margin-top:6px" onclick="sendDeliveryConfirmation(${index})">💬 تأكيد التسليم WhatsApp</button>` : ''}
+        </div>`;
+}
+
+function showParcelView(view) {
+    const box = document.getElementById('filteredParcelView');
+    if (!box) return;
+
+    const original = document.getElementById('parcelsList');
+    const originalCard = original ? original.closest('.card') : null;
+
+    // Keep the original "الطرود بالشنطة" list visible for ALL.
+    if (originalCard) originalCard.style.display = view === 'all' ? 'block' : 'none';
+
+    if (view === 'all') {
+        box.style.display = 'none';
+        return;
+    }
+
+    box.style.display = 'block';
+
+    let list = [];
+    if (view === 'today') {
+        list = parcels.filter(isParcelToday);
+    } else if (view === 'history') {
+        list = parcels.filter(p => p.status === 'delivered');
+    } else {
+        list = parcels.filter(p => p.status === 'pending' || p.status === 'reattempt');
+        list.sort((a,b) => Number(a.routeOrder || 999999) - Number(b.routeOrder || 999999));
+    }
+
+    const title = view === 'today' ? '📅 طرود اليوم' : view === 'history' ? '🕘 الطرود المستلمة' : '🚚 مسار التسليم';
+    box.innerHTML = `<div style="font-weight:bold;color:#38bdf8;margin-bottom:6px">${title} <span class="section-count">(${list.length})</span></div>` +
+        (list.length ? list.map(p => renderFilteredParcel(p, parcels.indexOf(p))).join('') : '<div class="empty">لا توجد طرود هنا.</div>');
+}
+
+function openParcelNavigation(index) {
+    const p = parcels[index];
+    const destination = Number.isFinite(Number(p.lat)) && Number.isFinite(Number(p.lon))
+        ? `${p.lat},${p.lon}`
+        : getAddress(p);
+    window.open('https://www.google.com/maps/dir/?api=1&destination=' + encodeURIComponent(destination), '_blank');
+}
+
+function sendDeliveryConfirmation(index) {
+    const p = parcels[index];
+    const wa = phoneForWhatsApp(p.phone);
+    if (!wa) return alert('لا يوجد رقم هاتف لهذا الطرد.');
+    const text = 'Hallo, Ihr Paket wurde erfolgreich zugestellt. Vielen Dank!';
+    window.open('https://wa.me/' + wa + '?text=' + encodeURIComponent(text), '_blank');
+}
+
+function openSignature(index) {
+    let modal = document.getElementById('signatureModal');
+    if (!modal) {
+        modal = document.createElement('div');
+        modal.id = 'signatureModal';
+        modal.className = 'modal show';
+        modal.innerHTML = `
+            <div class="modal-content">
+                <h3>✍️ توقيع المستلم</h3>
+                <canvas id="signatureCanvas" class="signature-canvas" width="900" height="400"></canvas>
+                <div class="modal-actions">
+                    <button class="modal-btn" onclick="saveSignature()">✅ حفظ</button>
+                    <button class="modal-btn close-btn" onclick="clearSignature()">🗑️ مسح</button>
+                </div>
+                <button class="modal-btn close-btn" style="width:100%;margin-top:6px" onclick="closeSignature()">إغلاق</button>
+            </div>`;
+        document.body.appendChild(modal);
+        setupSignatureCanvas();
+    }
+    modal.dataset.index = String(index);
+    modal.classList.add('show');
+    clearSignature();
+}
+
+function setupSignatureCanvas() {
+    const canvas = document.getElementById('signatureCanvas');
+    if (!canvas || canvas.dataset.ready) return;
+    canvas.dataset.ready = '1';
+    const ctx = canvas.getContext('2d');
+    ctx.lineWidth = 3; ctx.lineCap = 'round'; ctx.strokeStyle = '#111827';
+    let drawing = false;
+    const point = e => {
+        const r = canvas.getBoundingClientRect();
+        const q = e.touches ? e.touches[0] : e;
+        return {x:(q.clientX-r.left)*canvas.width/r.width, y:(q.clientY-r.top)*canvas.height/r.height};
+    };
+    const start = e => { drawing=true; const p=point(e); ctx.beginPath(); ctx.moveTo(p.x,p.y); e.preventDefault(); };
+    const move = e => { if(!drawing)return; const p=point(e); ctx.lineTo(p.x,p.y); ctx.stroke(); e.preventDefault(); };
+    const stop = () => drawing=false;
+    canvas.addEventListener('mousedown',start); canvas.addEventListener('mousemove',move); canvas.addEventListener('mouseup',stop); canvas.addEventListener('mouseleave',stop);
+    canvas.addEventListener('touchstart',start,{passive:false}); canvas.addEventListener('touchmove',move,{passive:false}); canvas.addEventListener('touchend',stop);
+}
+
+function clearSignature() {
+    const c=document.getElementById('signatureCanvas');
+    if(c) c.getContext('2d').clearRect(0,0,c.width,c.height);
+}
+
+function closeSignature() {
+    const m=document.getElementById('signatureModal');
+    if(m) m.classList.remove('show');
+}
+
+function saveSignature() {
+    const m=document.getElementById('signatureModal');
+    const c=document.getElementById('signatureCanvas');
+    if(!m || !c) return;
+    const index=Number(m.dataset.index);
+    const pixels=c.getContext('2d').getImageData(0,0,c.width,c.height).data;
+    let ink=false;
+    for(let i=3;i<pixels.length;i+=4){ if(pixels[i]>0){ink=true;break;} }
+    if(!ink) return alert('يرجى توقيع المستلم أولًا.');
+    parcels[index].signatureUrl=c.toDataURL('image/png');
+    parcels[index].signatureAt=new Date().toISOString();
+    saveAndSync();
+    closeSignature();
+}
+
+/* Preserve the original list: these additions only add filtered views. */
+const originalSaveParcelForm = window.saveParcelForm;
+
+async function geocodeForRoute(parcel) {
+    if (Number.isFinite(Number(parcel.lat)) && Number.isFinite(Number(parcel.lon))) return true;
+    const address = getAddress(parcel);
+    if (!address || address === 'عنوان غير مكتمل') return false;
+    try {
+        const r = await fetch(GEOCODE_BACKEND_URL + '?q=' + encodeURIComponent(address));
+        const d = await r.json();
+        if (!d.success || !Number.isFinite(Number(d.lat)) || !Number.isFinite(Number(d.lon))) return false;
+        parcel.lat=Number(d.lat); parcel.lon=Number(d.lon);
+        return true;
+    } catch(e) { return false; }
+}
+
+async function optimizeRouteSafe() {
+    const candidates=parcels.filter(p=>p.status==='pending'||p.status==='reattempt');
+    if(!candidates.length) return alert('لا توجد طرود متبقية.');
+    if(lastLat===null||lastLon===null) return alert('اسمح للتطبيق بالوصول إلى موقعك أولًا.');
+    showLoading(true);
+    try {
+        for(let i=0;i<candidates.length;i++){
+            await geocodeForRoute(candidates[i]);
+            document.getElementById('loading').textContent=`📍 تحديد مواقع الطرود ${i+1}/${candidates.length}`;
+            if(i<candidates.length-1) await new Promise(r=>setTimeout(r,1100));
+        }
+        const remaining=candidates.filter(p=>Number.isFinite(Number(p.lat))&&Number.isFinite(Number(p.lon)));
+        if(!remaining.length) throw new Error('لم يتم العثور على إحداثيات للطرود.');
+        const ordered=[]; let lat=Number(lastLat), lon=Number(lastLon);
+        while(remaining.length){
+            let bi=0, bd=Infinity;
+            remaining.forEach((p,i)=>{const d=calculateDistance(lat,lon,p.lat,p.lon);if(d<bd){bd=d;bi=i;}});
+            const p=remaining.splice(bi,1)[0];
+            p.routeOrder=ordered.length+1; p.routeDistanceKm=Number(bd.toFixed(2));
+            ordered.push(p); lat=p.lat; lon=p.lon;
+        }
+        saveAndSync();
+        showParcelView('route');
+        const n=ordered[0];
+        const next=document.getElementById('nextStop');
+        if(next){next.style.display='block';next.innerHTML=`<b>🚚 الطرد التالي</b><br>📍 ${escapeHTML(getAddress(n))}<br>📏 ${formatRouteDistance(n.routeDistanceKm)}<br><button class="action-btn map-btn" style="width:100%;margin-top:5px" onclick="openParcelNavigation(${parcels.indexOf(n)})">🧭 الملاحة</button>`;}
+    } catch(e){ alert(e.message||'تعذر ترتيب المسار.'); }
+    finally { setTimeout(()=>showLoading(false),700); }
+}
+
+// Initialize views after the original UI has rendered. The original list remains the source of truth.
+setTimeout(() => {
+    parcels.forEach(p => { if(!p.createdAt) p.createdAt = p.id ? new Date(Number(p.id)).toISOString() : new Date().toISOString(); });
+    localStorage.setItem('saved_parcels', JSON.stringify(parcels));
+    showParcelView('all');
+}, 0);
+
+
+/* =====================================================
+   ROBUST PARCEL ACTION HANDLERS
+   Works for dynamically rendered parcel cards too.
+===================================================== */
+
+window.markDelivered = markDelivered;
+window.markAbsent = markAbsent;
+window.takeProof = takeProof;
+window.openSignature = openSignature;
+window.editParcel = editParcel;
+window.openParcelNavigation = openParcelNavigation;
+window.sendDeliveryConfirmation = sendDeliveryConfirmation;
+window.showParcelView = showParcelView;
+
+if (!window.__parcelActionHandlerInstalled) {
+    window.__parcelActionHandlerInstalled = true;
+
+    document.addEventListener('click', function (event) {
+        const button = event.target.closest('[data-parcel-action]');
+        if (!button) return;
+
+        const action = button.dataset.parcelAction;
+        const index = Number(button.dataset.parcelIndex);
+
+        if (!Number.isInteger(index) || !parcels[index]) return;
+
+        event.preventDefault();
+        event.stopPropagation();
+
+        try {
+            if (action === 'deliver') markDelivered(index);
+            else if (action === 'proof') takeProof(index);
+            else if (action === 'signature') openSignature(index);
+            else if (action === 'edit') editParcel(index);
+            else if (action === 'absent') markAbsent(index);
+            else if (action === 'navigation') openParcelNavigation(index);
+            else if (action === 'whatsapp') sendDeliveryConfirmation(index);
+        } catch (error) {
+            console.error('Parcel action error:', error);
+            alert('تعذر تنفيذ العملية. حاول مرة أخرى.');
+        }
+    });
+}
+
+
+
     (function initLiveClock() {
         function updateLiveClock() {
             const now = new Date();
             const timeEl = document.getElementById("liveTime");
             const dateEl = document.getElementById("liveDate");
-
             if (timeEl) {
                 timeEl.textContent = now.toLocaleTimeString("de-DE", {
-                    hour: "2-digit",
-                    minute: "2-digit",
-                    second: "2-digit"
+                    hour: "2-digit", minute: "2-digit", second: "2-digit"
                 });
             }
-
             if (dateEl) {
                 dateEl.textContent = now.toLocaleDateString("ar-DE", {
-                    weekday: "long",
-                    day: "2-digit",
-                    month: "long",
-                    year: "numeric"
+                    weekday: "long", day: "2-digit", month: "long", year: "numeric"
                 });
             }
         }
@@ -3599,77 +4332,45 @@ updateConnection();
 
 
 
-function getValidParcelCoords(parcel) {
-    if (!parcel || typeof parcel !== "object") return null;
-
-    const lat = Number(
-        parcel.lat ??
-        parcel.latitude ??
-        parcel.coordinates?.lat ??
-        parcel.coordinates?.latitude
-    );
-
-    const lon = Number(
-        parcel.lon ??
-        parcel.lng ??
-        parcel.longitude ??
-        parcel.coordinates?.lon ??
-        parcel.coordinates?.lng ??
-        parcel.coordinates?.longitude
-    );
-
-    if (
-        !Number.isFinite(lat) ||
-        !Number.isFinite(lon) ||
-        Math.abs(lat) > 90 ||
-        Math.abs(lon) > 180
-    ) {
-        return null;
-    }
-
-    return { lat, lon };
-}
-
 function formatRouteDistance(km) {
-    if (!Number.isFinite(km) || km < 0) return "—";
-    if (km < 1) return `${Math.round(km * 1000)} م`;
-    return `${formatRouteDistance(km)}`;
+    if (!Number.isFinite(Number(km)) || Number(km) < 0) return "—";
+    const n = Number(km);
+    return n < 1 ? `${Math.round(n * 1000)} م` : `${n.toFixed(2)} كم`;
 }
 
 
-function cleanPastedText(value) {
-    if (value == null) return "";
-    return String(value)
+
+function cleanFormText(value) {
+    return String(value ?? "")
+        .replace(/\uFFFD/g, "")
         .replace(/\uFEFF/g, "")
-        .replace(/\u200B|\u200C|\u200D/g, "")
-        .replace(/\r\n?/g, "\n")
-        .replace(/[ \t]+/g, " ")
+        .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g, "")
         .trim();
 }
 
-function setInputValueSafe(id, value) {
-    const el = document.getElementById(id);
-    if (!el) return;
-    el.value = cleanPastedText(value);
-    el.dispatchEvent(new Event("input", { bubbles: true }));
-    el.dispatchEvent(new Event("change", { bubbles: true }));
-}
-
-
-function normalizeParcelFormFields() {
-    const ids = [
-        "name", "address", "street", "houseNumber", "postalCode",
-        "city", "phone", "trackingNumber", "notes"
-    ];
-    ids.forEach(id => {
-        const el = document.getElementById(id);
-        if (el && typeof el.value === "string") {
-            el.value = cleanPastedText(el.value);
-        }
-    });
-}
-
 </script>
+
+
+<!-- Batch AI Camera -->
+<div id="batchCameraModal" aria-hidden="true">
+  <div class="batch-camera-box">
+    <h3 style="margin:4px 0 8px;text-align:center">📦📷 تصوير كل الطرود</h3>
+    <div style="text-align:center;color:#cbd5e1;font-size:12px">
+      صوّر الطرود واحدًا بعد الآخر بدون الرجوع للواجهة. عند الانتهاء اضغط «إنهاء وتحليل».
+    </div>
+    <video id="batchCameraVideo" autoplay playsinline muted></video>
+    <div id="batchPhotoCount">تم التقاط 0 صورة</div>
+    <div id="batchThumbs"></div>
+    <div id="batchCameraStatus"></div>
+    <div class="batch-camera-actions">
+      <button id="batchCaptureBtn">📸 تصوير الطرد</button>
+      <button id="batchFinishBtn">🤖 إنهاء وتحليل الكل</button>
+      <button id="batchGalleryBtn">🖼️ اختيار صور من الجهاز</button>
+      <button id="batchCameraCloseBtn">✕ إغلاق</button>
+    </div>
+    <input id="batchGalleryInput" type="file" accept="image/*" multiple hidden>
+  </div>
+</div>
 
 </body>
 </html>
