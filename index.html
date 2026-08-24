@@ -4344,7 +4344,7 @@ setTimeout(() => {
 ===================================================== */
 
 
-async function markDelivered(index) {
+function markDelivered(index) {
     const parcel = parcels[index];
 
     if (!parcel) {
@@ -4352,45 +4352,17 @@ async function markDelivered(index) {
         return;
     }
 
-    // Archive immediately.
+    // Instant UI state: mark and remove from active route immediately.
     parcel.status = "delivered";
     parcel.deliveredAt = new Date().toISOString();
-
-    // Remove stale route position so it disappears from active route.
     parcel.routeOrder = null;
     parcel.routeDistanceKm = null;
 
-    // Capture current GPS when available.
-    if (
-        navigator.geolocation &&
-        typeof navigator.geolocation.getCurrentPosition === "function"
-    ) {
-        await new Promise(resolve => {
-            navigator.geolocation.getCurrentPosition(
-                position => {
-                    parcel.deliveredLat =
-                        position.coords.latitude;
-                    parcel.deliveredLon =
-                        position.coords.longitude;
-                    resolve();
-                },
-                () => resolve(),
-                {
-                    enableHighAccuracy: true,
-                    timeout: 8000,
-                    maximumAge: 0
-                }
-            );
-        });
-    }
-
-    // Persist before changing the view.
+    // Save immediately; do not wait for GPS or WhatsApp.
     saveAndSync();
-
-    // Refresh the active list: delivered parcel disappears from it.
     updateUI();
 
-    // Open History automatically, where the delivered parcel remains saved.
+    // Open History immediately.
     setTimeout(() => {
         try {
             showParcelView("history");
@@ -4399,13 +4371,46 @@ async function markDelivered(index) {
         }
     }, 0);
 
-    // Send WhatsApp confirmation automatically when a phone exists.
+    // GPS is optional and happens in the background.
+    if (
+        navigator.geolocation &&
+        typeof navigator.geolocation.getCurrentPosition === "function"
+    ) {
+        navigator.geolocation.getCurrentPosition(
+            position => {
+                parcel.deliveredLat =
+                    position.coords.latitude;
+                parcel.deliveredLon =
+                    position.coords.longitude;
+
+                // Persist the GPS enrichment without blocking the UI.
+                try {
+                    localStorage.setItem(
+                        "saved_parcels",
+                        JSON.stringify(parcels)
+                    );
+                } catch (e) {
+                    console.error("GPS save:", e);
+                }
+            },
+            () => {},
+            {
+                enableHighAccuracy: true,
+                timeout: 3000,
+                maximumAge: 30000
+            }
+        );
+    }
+
+    // WhatsApp is also optional; launch it after the UI has changed.
     if (parcel.phone) {
-        try {
-            sendDeliveryConfirmation(index);
-        } catch (e) {
-            console.error("WhatsApp:", e);
-        }
+        setTimeout(() => {
+            try {
+                sendDeliveryConfirmation(index);
+            } catch (e) {
+                console.error("WhatsApp:", e);
+            }
+        }, 50);
     }
 }
 
