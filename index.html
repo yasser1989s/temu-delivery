@@ -1490,7 +1490,10 @@ function initBatchImport() {
     if (!button) return;
 
     // Main button opens the continuous camera.
-    button.addEventListener("click", openBatchCamera);
+    if (!button.dataset.batchBound) {
+        button.addEventListener("click", openBatchCamera);
+        button.dataset.batchBound = "1";
+    }
 
     const captureBtn =
         document.getElementById("batchCaptureBtn");
@@ -1504,32 +1507,36 @@ function initBatchImport() {
     const galleryBtn =
         document.getElementById("batchGalleryBtn");
 
-    if (captureBtn) {
+    if (captureBtn && !captureBtn.dataset.batchBound) {
         captureBtn.addEventListener(
             "click",
             captureBatchParcelPhoto
         );
+        captureBtn.dataset.batchBound = "1";
     }
 
-    if (finishBtn) {
+    if (finishBtn && !finishBtn.dataset.batchBound) {
         finishBtn.addEventListener(
             "click",
             finishBatchCamera
         );
+        finishBtn.dataset.batchBound = "1";
     }
 
-    if (closeBtn) {
+    if (closeBtn && !closeBtn.dataset.batchBound) {
         closeBtn.addEventListener(
             "click",
             closeBatchCamera
         );
+        closeBtn.dataset.batchBound = "1";
     }
 
-    if (galleryBtn && galleryInput) {
+    if (galleryBtn && galleryInput && !galleryBtn.dataset.batchBound) {
         galleryBtn.addEventListener(
             "click",
             () => galleryInput.click()
         );
+        galleryBtn.dataset.batchBound = "1";
 
         galleryInput.addEventListener(
             "change",
@@ -1572,7 +1579,17 @@ function initBatchImport() {
     }
 }
 
-initBatchImport();
+document.addEventListener("DOMContentLoaded", function () {
+    initBatchImport();
+});
+window.addEventListener("load", function () {
+    // Rebind only if the modal exists and the main button has not been bound.
+    const btn = document.getElementById("batchImportBtn");
+    if (btn && !btn.dataset.batchBound) {
+        initBatchImport();
+    }
+});
+
 
 /* =====================================================
    OPEN PARCEL FORM
