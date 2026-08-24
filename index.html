@@ -802,6 +802,79 @@
                 font-size: 19px;
             }
         }
+    
+        /* Proof / Signature viewer */
+        .media-viewer {
+            position: fixed;
+            inset: 0;
+            z-index: 100000;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            padding: 14px;
+            background: rgba(0,0,0,.94);
+            backdrop-filter: blur(8px);
+        }
+
+        .media-viewer.show { display: flex; }
+
+        .media-viewer-card {
+            width: min(96vw, 760px);
+            max-height: 94vh;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            padding: 12px;
+            border-radius: 20px;
+            background: #0f172a;
+            border: 1px solid #334155;
+        }
+
+        .media-viewer-image {
+            width: 100%;
+            max-height: 72vh;
+            object-fit: contain;
+            background: #fff;
+            border-radius: 12px;
+            touch-action: pinch-zoom;
+        }
+
+        .media-viewer-title {
+            text-align: center;
+            font-size: 14px;
+            font-weight: 800;
+            color: #e2e8f0;
+        }
+
+        .media-viewer-actions {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+        }
+
+        .media-viewer-btn {
+            min-height: 44px;
+            border: 0;
+            border-radius: 12px;
+            color: #fff;
+            font-weight: 800;
+            cursor: pointer;
+            font-size: 13px;
+        }
+
+        .media-download {
+            background: linear-gradient(135deg, #2563eb, #7c3aed);
+        }
+
+        .media-close {
+            background: #334155;
+        }
+
+        .proof-img.zoomable,
+        .signature-image.zoomable {
+            cursor: zoom-in;
+        }
+
     </style>
 
 <style id="batch-camera-style">
@@ -3864,8 +3937,8 @@ function renderFilteredParcel(parcel, index) {
                 <button class="action-btn" style="background:#9333ea" data-parcel-action="signature" data-parcel-index="${index}" onclick="openSignature(${index})">✍️ توقيع</button>
                 <button class="action-btn edit-btn" data-parcel-action="edit" data-parcel-index="${index}" onclick="editParcel(${index})">✏️ تعديل</button>
             </div>
-            ${parcel.proofUrl ? `<div style="margin-top:6px"><b>📸 صورة التسليم</b><img class="proof-img" src="${escapeHTML(parcel.proofUrl)}"></div>` : ''}
-            ${parcel.signatureUrl ? `<div style="margin-top:6px"><b>✍️ توقيع المستلم</b><img class="proof-img" src="${escapeHTML(parcel.signatureUrl)}"></div>` : ''}
+            ${parcel.proofUrl ? `<div style="margin-top:6px"><b>📸 صورة التسليم</b><img class="proof-img zoomable" src="${escapeHTML(parcel.proofUrl)}" data-media-viewer data-media-type="proof" data-media-src="${encodeURIComponent(parcel.proofUrl)}" data-media-viewer data-media-type="proof" data-media-src="${encodeURIComponent(parcel.proofUrl)}"></div>` : ''}
+            ${parcel.signatureUrl ? `<div style="margin-top:6px"><b>✍️ توقيع المستلم</b><img class="proof-img zoomable signature-image" src="${escapeHTML(parcel.signatureUrl)}" data-media-viewer data-media-type="signature" data-media-src="${encodeURIComponent(parcel.signatureUrl)}" data-media-viewer data-media-type="signature" data-media-src="${encodeURIComponent(parcel.signatureUrl)}"></div>` : ''}
             ${parcel.status === 'delivered' && phone ? `<button class="action-main-btn" style="background:#16a34a;margin-top:6px" onclick="sendDeliveryConfirmation(${index})">💬 تأكيد التسليم WhatsApp</button>` : ''}
         </div>`;
 }
@@ -4493,6 +4566,100 @@ function cleanFormText(value) {
         .trim();
 }
 
+
+
+let currentMediaDataUrl = "";
+let currentMediaFilename = "delivery-proof.png";
+
+function openMediaViewer(dataUrl, title, filename) {
+    if (!dataUrl) return;
+
+    const viewer = document.getElementById("mediaViewer");
+    const image = document.getElementById("mediaViewerImage");
+    const titleEl = document.getElementById("mediaViewerTitle");
+    const downloadBtn = document.getElementById("mediaDownloadBtn");
+
+    if (!viewer || !image || !titleEl || !downloadBtn) return;
+
+    currentMediaDataUrl = dataUrl;
+    currentMediaFilename = filename || "delivery-proof.png";
+
+    titleEl.textContent = title || "إثبات التسليم";
+    image.src = dataUrl;
+
+    viewer.classList.add("show");
+    viewer.setAttribute("aria-hidden", "false");
+
+    downloadBtn.onclick = () => {
+        saveMediaImage(
+            currentMediaDataUrl,
+            currentMediaFilename
+        );
+    };
+}
+
+function closeMediaViewer() {
+    const viewer = document.getElementById("mediaViewer");
+    const image = document.getElementById("mediaViewerImage");
+
+    if (!viewer) return;
+
+    viewer.classList.remove("show");
+    viewer.setAttribute("aria-hidden", "true");
+
+    if (image) image.removeAttribute("src");
+
+    currentMediaDataUrl = "";
+}
+
+function saveMediaImage(dataUrl, filename) {
+    if (!dataUrl) return;
+
+    try {
+        const a = document.createElement("a");
+        a.href = dataUrl;
+        a.download = filename || "delivery-proof.png";
+        a.rel = "noopener";
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+    } catch (error) {
+        console.error("Image save:", error);
+        window.open(dataUrl, "_blank", "noopener");
+    }
+}
+
+document.addEventListener("click", function(event) {
+    const viewer = document.getElementById("mediaViewer");
+    if (viewer && event.target === viewer) {
+        closeMediaViewer();
+    }
+
+    const media = event.target.closest("[data-media-viewer]");
+    if (!media) return;
+
+    const encoded = media.getAttribute("data-media-src");
+    const type = media.getAttribute("data-media-type");
+
+    if (!encoded) return;
+
+    try {
+        const src = decodeURIComponent(encoded);
+
+        openMediaViewer(
+            src,
+            type === "signature"
+                ? "✍️ توقيع المستلم"
+                : "📸 صورة التسليم",
+            type === "signature"
+                ? "recipient-signature.png"
+                : "delivery-proof.png"
+        );
+    } catch (error) {
+        console.error("Media viewer:", error);
+    }
+});
+
 </script>
 
 
@@ -4515,6 +4682,22 @@ function cleanFormText(value) {
     </div>
     <input id="batchGalleryInput" type="file" accept="image/*" multiple hidden>
   </div>
+</div>
+
+
+<div id="mediaViewer" class="media-viewer" aria-hidden="true">
+    <div class="media-viewer-card" onclick="event.stopPropagation()">
+        <div id="mediaViewerTitle" class="media-viewer-title">إثبات التسليم</div>
+        <img id="mediaViewerImage" class="media-viewer-image" alt="إثبات التسليم">
+        <div class="media-viewer-actions">
+            <button id="mediaDownloadBtn" class="media-viewer-btn media-download">
+                💾 حفظ الصورة
+            </button>
+            <button class="media-viewer-btn media-close" onclick="closeMediaViewer()">
+                إغلاق
+            </button>
+        </div>
+    </div>
 </div>
 
 </body>
