@@ -3129,431 +3129,198 @@ function getAddress(
 
 
 function updateUI() {
+    const listEl = document.getElementById("parcelsList");
 
-    const listEl =
-        document.getElementById(
-            "parcelsList"
-        );
+    // The list may be temporarily hidden/rebuilt by filtered views.
+    // Never assume DOM nodes from the old list still exist.
+    if (!listEl) return;
 
+    let totalEl = document.getElementById("totalCount");
+    let deliveredEl = document.getElementById("deliveredCount");
+    let remainingEl = document.getElementById("remainingCount");
+    let absentEl = document.getElementById("absentCount");
+    let distanceEl = document.getElementById("distanceKm");
 
-    const emptyMsg =
-        document.getElementById(
-            "emptyMsg"
-        );
+    const total = parcels.length;
 
+    const delivered = parcels.filter(
+        p => p && p.status === "delivered"
+    ).length;
 
-    const total =
-        parcels.length;
+    const absent = parcels.filter(
+        p => p && p.status === "absent"
+    ).length;
 
+    const remaining = parcels.filter(
+        p =>
+            p &&
+            (
+                p.status === "pending" ||
+                p.status === "reattempt"
+            )
+    ).length;
 
-    const delivered =
-        parcels.filter(
-            p =>
-                p.status ===
-                "delivered"
-        ).length;
+    if (totalEl) totalEl.innerText = total;
+    if (deliveredEl) deliveredEl.innerText = delivered;
+    if (remainingEl) remainingEl.innerText = remaining;
+    if (absentEl) absentEl.innerText = absent;
+    if (distanceEl) {
+        distanceEl.innerText =
+            `${Number(totalDistance || 0).toFixed(2)} كم`;
+    }
 
-
-    const absent =
-        parcels.filter(
-            p =>
-                p.status ===
-                "absent"
-        ).length;
-
-
-    const remaining =
-        parcels.filter(
-            p =>
-                p.status ===
-                    "pending" ||
-                p.status ===
-                    "reattempt"
-        ).length;
-
-
-    document.getElementById(
-        "totalCount"
-    ).innerText =
-        total;
-
-
-    document.getElementById(
-        "deliveredCount"
-    ).innerText =
-        delivered;
-
-
-    document.getElementById(
-        "remainingCount"
-    ).innerText =
-        remaining;
-
-
-    document.getElementById(
-        "absentCount"
-    ).innerText =
-        absent;
-
-
-    document.getElementById(
-        "distanceKm"
-    ).innerText =
-        totalDistance.toFixed(2) +
-        " كم";
-
-
-    listEl.innerHTML =
-        "";
-
+    // Never keep a stale #emptyMsg reference after innerHTML is cleared.
+    listEl.innerHTML = "";
 
     if (!total) {
-
-        listEl.appendChild(
-            emptyMsg
-        );
-
-        emptyMsg.style.display =
-            "block";
-
+        const emptyMsg = document.createElement("p");
+        emptyMsg.id = "emptyMsg";
+        emptyMsg.className = "empty";
+        emptyMsg.textContent = "ما في طرود مضافة. ابدأ الإدخال!";
+        listEl.appendChild(emptyMsg);
         return;
     }
 
+    parcels.forEach((parcel, index) => {
+        const address = getAddress(parcel);
 
-    emptyMsg.style.display =
-        "none";
+        const mapsUrl =
+            "https://www.google.com/maps/search/?api=1&query=" +
+            encodeURIComponent(address);
 
+        const phone = parcel.phone || "";
 
-    parcels.forEach(
-        (parcel, index) => {
+        const li = document.createElement("li");
 
-            const address =
-                getAddress(
-                    parcel
-                );
+        li.innerHTML = `
+            <div class="parcel-info">
+                <span>
+                    📦 #${index + 1}
+                    ${parcel.barcode
+                        ? " · " + escapeHTML(parcel.barcode)
+                        : ""}
+                </span>
+                ${parcelStatusHTML(parcel)}
+            </div>
 
+            <div class="parcel-info">
+                👤 ${escapeHTML(parcel.name || "بدون اسم")}
+            </div>
 
-            const mapsUrl =
-                "https://www.google.com/maps/search/?api=1&query=" +
-                encodeURIComponent(
-                    address
-                );
+            <div class="address-box">
+                📍 ${escapeHTML(address)}
+            </div>
 
-
-            const phone =
-                parcel.phone ||
-                "";
-
-
-            const smsUrl =
-                phone
-                    ? `sms:${phone}?body=${encodeURIComponent(
-                        "Hallo, Ihr Paket wurde erfolgreich zugestellt. Vielen Dank!"
-                    )}`
-                    : "#";
-
-
-            const waUrl =
-                phone
-                    ? `https://wa.me/${phone.replace(
-                        /\D/g,
-                        ""
-                    )}?text=${encodeURIComponent(
-                        "Hallo, ich bin gerade in Ihrer Straße und habe Ihr Paket dabei."
-                    )}`
-                    : "#";
-
-
-            let statusBadge =
-                `<span class="status-badge">قيد الانتظار</span>`;
-
-
-            if (
-                parcel.status ===
-                "delivered"
-            ) {
-
-                statusBadge =
-                    `<span class="status-badge status-delivered">✓ تم</span>`;
-
-            } else if (
-                parcel.status ===
-                "absent"
-            ) {
-
-                statusBadge =
-                    `<span class="status-badge status-absent">✕ غياب</span>`;
-
-            } else if (
-                parcel.status ===
-                "reattempt"
-            ) {
-
-                statusBadge =
-                    `<span class="status-badge status-reattempt">🔄 إعادة</span>`;
-            }
-
-
-            const li =
-                document.createElement(
-                    "li"
-                );
-
-
-            li.innerHTML = `
-
-                <div class="parcel-info">
-
-                    <span>
-                        📦 #${index + 1}
-                        ${
-                            parcel.barcode
-                                ? " · " +
-                                  escapeHTML(
-                                      parcel.barcode
-                                  )
-                                : ""
-                        }
-                    </span>
-
-                    ${statusBadge}
-
-                </div>
-
-
-                <div class="parcel-info">
-
-                    <span>
-                        ${escapeHTML(
-                            parcel.name ||
-                            "بدون اسم"
-                        )}
-                    </span>
-
-                </div>
-
-
-                <div class="address-box">
-
-                    📍
-                    ${escapeHTML(
-                        address
-                    )}
-
-                </div>
-
-
+            ${phone ? `
                 <div class="parcel-fields">
-
-                    ${
-                        parcel.phone
-                            ? "📞 " +
-                              escapeHTML(
-                                  parcel.phone
-                              )
-                            : "📞 بدون هاتف"
-                    }
-
-                    ${
-                        parcel.notes
-                            ? "<br>📝 " +
-                              escapeHTML(
-                                  parcel.notes
-                              )
-                            : ""
-                    }
-
+                    📞 ${escapeHTML(phone)}
                 </div>
+            ` : ""}
 
+            ${parcel.status === "delivered" ? `
+                <div class="parcel-fields">
+                    🕐 تم التسليم:
+                    ${escapeHTML(
+                        new Date(
+                            parcel.deliveredAt || Date.now()
+                        ).toLocaleString("de-DE")
+                    )}
+                </div>
+            ` : ""}
 
-                <div class="btn-group">
+            ${parcel.notes ? `
+                <div class="parcel-fields">
+                    📝 ${escapeHTML(parcel.notes)}
+                </div>
+            ` : ""}
 
+            <div class="btn-group">
+                <button
+                    class="action-btn map-btn"
+                    data-parcel-action="navigation"
+                    data-parcel-index="${index}"
+                >
+                    🧭 ملاحة
+                </button>
+
+                <a
+                    href="${mapsUrl}"
+                    target="_blank"
+                    rel="noopener"
+                    class="action-btn map-btn"
+                >
+                    🗺️ خريطة
+                </a>
+
+                ${phone ? `
                     <a
-                        href="${mapsUrl}"
-                        target="_blank"
-                        class="action-btn map-btn"
+                        href="tel:${escapeHTML(phone)}"
+                        class="action-btn"
+                        style="background:#2563eb"
                     >
-                        🗺️ خريطة
+                        📞 اتصال
                     </a>
+                ` : ""}
 
-
-                    ${
-                        phone
-                            ? `
-                                <a
-                                    href="${smsUrl}"
-                                    class="action-btn sms-btn"
-                                >
-                                    💬 SMS
-                                </a>
-                            `
-                            : ""
-                    }
-
-
-                    ${
-                        phone
-                            ? `
-                                <a
-                                    href="${waUrl}"
-                                    target="_blank"
-                                    class="action-btn wa-btn"
-                                >
-                                    🟢 واتساب
-                                </a>
-                            `
-                            : ""
-                    }
-
-
-                    ${
-                        parcel.status !==
-                        "delivered"
-                            ? `
-                                <button
-                                    class="action-btn deliver-btn"
-                                    data-parcel-action="deliver"
-                                    data-parcel-index="${index}"
-                                    onclick="markDelivered(${index})"
-                                >
-                                    ✅ تسليم
-                                </button>
-                            `
-                            : ""
-                    }
-
-
-                    ${
-                        parcel.status !==
-                        "absent"
-                            ? `
-                                <button
-                                    class="action-btn absent-btn"
-                                    data-parcel-action="absent"
-                                    data-parcel-index="${index}"
-                                    onclick="markAbsent(${index})"
-                                >
-                                    🏠 غياب
-                                </button>
-                            `
-                            : ""
-                    }
-
-
+                ${phone ? `
                     <button
-                        class="action-btn proof-btn"
-                        data-parcel-action="proof"
+                        class="action-btn wa-btn"
+                        data-parcel-action="whatsapp"
                         data-parcel-index="${index}"
-                        onclick="takeProof(${index})"
                     >
-                        📸 صورة
+                        💬 WhatsApp
                     </button>
+                ` : ""}
 
-
+                ${parcel.status !== "delivered" ? `
                     <button
-                        class="action-btn edit-btn"
-                        onclick="editParcel(${index})"
+                        class="action-btn deliver-btn"
+                        data-parcel-action="deliver"
+                        data-parcel-index="${index}"
                     >
-                        ✏️ تعديل
+                        ✅ تسليم
                     </button>
+                ` : ""}
 
-                </div>
+                <button
+                    class="action-btn absent-btn"
+                    data-parcel-action="absent"
+                    data-parcel-index="${index}"
+                >
+                    🏠 غياب
+                </button>
 
+                <button
+                    class="action-btn proof-btn"
+                    data-parcel-action="proof"
+                    data-parcel-index="${index}"
+                >
+                    📸 صورة
+                </button>
 
-                ${
-                    parcel.proofUrl
-                        ? `
-                            <img
-                                class="proof-img"
-                                src="${parcel.proofUrl}"
-                            >
-                        `
-                        : ""
-                }
+                <button
+                    class="action-btn"
+                    style="background:#9333ea"
+                    data-parcel-action="signature"
+                    data-parcel-index="${index}"
+                >
+                    ✍️ توقيع
+                </button>
 
-            `;
+                <button
+                    class="action-btn edit-btn"
+                    data-parcel-action="edit"
+                    data-parcel-index="${index}"
+                >
+                    ✏️ تعديل
+                </button>
+            </div>
+        `;
 
-
-            listEl.appendChild(
-                li
-            );
-        }
-    );
+        listEl.appendChild(li);
+    });
 }
 
-
-/* =====================================================
-   DELIVERED
-===================================================== */
-
-function markDelivered(
-    index
-) {
-
-    const parcel = parcels[index];
-    if (!parcel) return;
-
-    parcel.status = "delivered";
-    parcel.deliveredAt = new Date().toISOString();
-
-    // Save the current GPS position when available.
-    if (Number.isFinite(Number(lastLat)) && Number.isFinite(Number(lastLon))) {
-        parcel.deliveryLat = Number(lastLat);
-        parcel.deliveryLon = Number(lastLon);
-    }
-
-    saveAndSync();
-
-    // Keep the user on the same page and show a clear confirmation.
-    setTimeout(() => {
-        try {
-            alert("تم تأكيد تسليم الطرد وحفظه في History.");
-        } catch (_) {}
-    }, 0);
-}
-
-
-/* =====================================================
-   ABSENT
-===================================================== */
-
-function markAbsent(
-    index
-) {
-
-    const parcel =
-        parcels[index];
-
-
-    parcel.status =
-        "absent";
-
-
-    parcel.attempts =
-        (parcel.attempts || 0) +
-        1;
-
-
-    if (parcel.phone) {
-
-        const text =
-            encodeURIComponent(
-                "Hallo, ich habe versucht, Ihr Paket zuzustellen, aber Sie waren nicht zu Hause."
-            );
-
-
-        window.location.href =
-            `sms:${parcel.phone}?body=${text}`;
-    }
-
-
-    saveAndSync();
-}
-
-
-/* =====================================================
-   EDIT
-===================================================== */
 
 function editParcel(
     index
@@ -3832,16 +3599,11 @@ function optimizeRoute() {
    LOADING
 ===================================================== */
 
-function showLoading(
-    show
-) {
+function showLoading(show) {
+    const loading = document.getElementById("loading");
+    if (!loading) return;
 
-    document.getElementById(
-        "loading"
-    ).style.display =
-        show
-            ? "block"
-            : "none";
+    loading.style.display = show ? "block" : "none";
 }
 
 
@@ -4234,7 +3996,11 @@ async function optimizeRouteSafe() {
     try {
         for(let i=0;i<candidates.length;i++){
             await geocodeForRoute(candidates[i]);
-            document.getElementById('loading').textContent=`📍 تحديد مواقع الطرود ${i+1}/${candidates.length}`;
+            const loadingEl = document.getElementById("loading");
+            if (loadingEl) {
+                loadingEl.textContent =
+                    `📍 تحديد مواقع الطرود ${i + 1}/${candidates.length}`;
+            }
             if(i<candidates.length-1) await new Promise(r=>setTimeout(r,1100));
         }
         const remaining=candidates.filter(p=>Number.isFinite(Number(p.lat))&&Number.isFinite(Number(p.lon)));
@@ -4249,9 +4015,20 @@ async function optimizeRouteSafe() {
         }
         saveAndSync();
         showParcelView('route');
-        const n=ordered[0];
-        const next=document.getElementById('nextStop');
-        if(next){next.style.display='block';next.innerHTML=`<b>🚚 الطرد التالي</b><br>📍 ${escapeHTML(getAddress(n))}<br>📏 ${formatRouteDistance(n.routeDistanceKm)}<br><button class="action-btn map-btn" style="width:100%;margin-top:5px" onclick="openParcelNavigation(${parcels.indexOf(n)})">🧭 الملاحة</button>`;}
+        const n = ordered[0];
+        const next = document.getElementById("nextStop");
+
+        if (next && n) {
+            next.style.display = "block";
+            next.innerHTML =
+                `<b>🚚 الطرد التالي</b><br>` +
+                `📍 ${escapeHTML(getAddress(n))}<br>` +
+                `📏 ${formatRouteDistance(n.routeDistanceKm)}<br>` +
+                `<button class="action-btn map-btn" ` +
+                `style="width:100%;margin-top:5px" ` +
+                `onclick="openParcelNavigation(${parcels.indexOf(n)})">` +
+                `🧭 الملاحة</button>`;
+        }
     } catch(e){ alert(e.message||'تعذر ترتيب المسار.'); }
     finally { setTimeout(()=>showLoading(false),700); }
 }
