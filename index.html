@@ -502,6 +502,22 @@
             capture="environment"
             hidden
         >
+        <button
+            id="batchImportBtn"
+            class="action-main-btn"
+            style="background:#0f766e;"
+        >
+            📦➕ إضافة كل الطرود دفعة واحدة
+        </button>
+
+        <input
+            id="batchImportInput"
+            type="file"
+            accept="image/*"
+            multiple
+            hidden
+        >
+
 
 
         <!-- OCR محلي احتياطي -->
@@ -1128,6 +1144,185 @@ async function analyzeAddressWithAI(
     return data.data || {};
 }
 
+
+
+
+/* =====================================================
+   BATCH PARCEL IMPORT
+   Add one or many parcel images in one operation.
+   Each image may contain one parcel or several labels.
+===================================================== */
+
+function normalizeBatchParcel(item) {
+    if (!item || typeof item !== "object") return null;
+
+    const address =
+        item.address ||
+        item.fullAddress ||
+        [item.street || "", item.houseNumber || item.house || "", item.postalCode || item.zip || "", item.city || ""]
+            .filter(Boolean).join(" ").trim();
+
+    const parcel = {
+        id: Date.now() + Math.floor(Math.random() * 1000000),
+        name: String(item.name || item.recipientName || "").trim(),
+        street: String(item.street || "").trim(),
+        house: String(item.houseNumber || item.house || "").trim(),
+        zip: String(item.postalCode || item.zip || "").trim(),
+        city: String(item.city || "").trim(),
+        phone: String(item.phone || "").trim(),
+        barcode: String(item.trackingNumber || item.barcode || "").trim(),
+        notes: String(item.notes || "").trim(),
+        status: "pending",
+        proofUrl: null,
+        signatureUrl: null,
+        deliveredAt: null,
+        signatureAt: null,
+        lat: null,
+        lon: null,
+        routeOrder: null,
+        routeDistanceKm: null,
+        createdAt: new Date().toISOString()
+    };
+
+    // If Gemini returned only a combined address, preserve it in notes so it
+    // is not lost; the normal getAddress() function can still use the fields.
+    if (!parcel.street && address) parcel.notes = parcel.notes || address;
+
+    if (!parcel.street && !parcel.city && !parcel.name && !address) return null;
+    return parcel;
+}
+
+async function analyzeBatchImage(file) {
+    const image = await fileToDataURL(file);
+
+    const response = await fetch(
+        AI_BACKEND_URL + "/analyze-image",
+        {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                image,
+                mimeType: file.type || "image/jpeg",
+                prompt: `
+حلل صورة تحتوي على ملصق واحد أو عدة ملصقات طرود.
+استخرج جميع الطرود الظاهرة في الصورة. لا تتوقف عند أول طرد.
+أعد JSON فقط بهذا الشكل:
+{
+  "packages": [
+    {
+      "name": "",
+      "address": "",
+      "street": "",
+      "houseNumber": "",
+      "postalCode": "",
+      "city": "",
+      "phone": "",
+      "trackingNumber": "",
+      "notes": ""
+    }
+  ]
+}
+لا تخمن البيانات. إذا لم تكن قيمة واضحة اتركها فارغة.
+                `.trim()
+            })
+        }
+    );
+
+    const data = await response.json();
+
+    if (!response.ok || !data.success) {
+        throw new Error(data.error || "فشل تحليل صورة الدفعة");
+    }
+
+    let packages = data.data?.packages || data.data?.parcels || data.packages || [];
+
+    // If the model returned one parcel object instead of an array, accept it.
+    if (!Array.isArray(packages) && data.data && typeof data.data === "object") {
+        packages = [data.data];
+    }
+
+    return Array.isArray(packages) ? packages : [];
+}
+
+function parcelDedupKey(p) {
+    const tracking = String(p.barcode || "").replace(/\s+/g, "").toLowerCase();
+    if (tracking) return "tracking:" + tracking;
+    return [p.street, p.house, p.zip, p.city, p.name]
+        .map(v => String(v || "").trim().toLowerCase())
+        .join("|");
+}
+
+async function importAllParcelsBatch(files) {
+    if (!files || !files.length) return;
+
+    const batchBtn = document.getElementById("batchImportBtn");
+    if (batchBtn) batchBtn.disabled = true;
+    showLoading(true);
+
+    const detected = [];
+
+    try {
+        for (let i = 0; i < files.length; i++) {
+            const file = files[i];
+            document.getElementById("loading").textContent =
+                `🤖 قراءة الطرود ${i + 1}/${files.length}...`;
+
+            const items = await analyzeBatchImage(file);
+            detected.push(...items);
+        }
+
+        const existingKeys = new Set(parcels.map(parcelDedupKey));
+        const added = [];
+        const seen = new Set();
+
+        for (const item of detected) {
+            const p = normalizeBatchParcel(item);
+            if (!p) continue;
+
+            const key = parcelDedupKey(p);
+            if (!key || seen.has(key) || existingKeys.has(key)) continue;
+
+            seen.add(key);
+            added.push(p);
+        }
+
+        parcels.push(...added);
+        saveAndSync();
+
+        // Show the normal parcel list immediately.
+        showParcelView("all");
+
+        alert(
+            `تمت إضافة ${added.length} طرد من أصل ${detected.length} طرد مقروء.` +
+            (detected.length !== added.length
+                ? "\nتم تجاهل المكرر أو البيانات غير الكافية."
+                : "")
+        );
+
+    } catch (error) {
+        console.error(error);
+        alert("تعذر إضافة الطرود دفعة واحدة:\n\n" + (error.message || error));
+    } finally {
+        showLoading(false);
+        if (batchBtn) batchBtn.disabled = false;
+    }
+}
+
+function initBatchImport() {
+    const button = document.getElementById("batchImportBtn");
+    const input = document.getElementById("batchImportInput");
+    if (!button || !input) return;
+
+    button.addEventListener("click", () => input.click());
+
+    input.addEventListener("change", async event => {
+        const files = Array.from(event.target.files || []);
+        event.target.value = "";
+        await importAllParcelsBatch(files);
+    });
+}
+
+initBatchImport();
 
 /* =====================================================
    OPEN PARCEL FORM
