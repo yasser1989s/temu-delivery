@@ -2133,60 +2133,36 @@ function initTracker() {
 }
 
 
-function calculateDistance(
-    lat1,
-    lon1,
-    lat2,
-    lon2
-) {
+function haversineDistanceKm(lat1, lon1, lat2, lon2) {
+    const aLat = Number(lat1);
+    const aLon = Number(lon1);
+    const bLat = Number(lat2);
+    const bLon = Number(lon2);
 
-    const R = 6371;
+    // Reject invalid coordinates before doing any math.
+    if (
+        !Number.isFinite(aLat) || !Number.isFinite(aLon) ||
+        !Number.isFinite(bLat) || !Number.isFinite(bLon) ||
+        Math.abs(aLat) > 90 || Math.abs(bLat) > 90 ||
+        Math.abs(aLon) > 180 || Math.abs(bLon) > 180
+    ) {
+        return NaN;
+    }
 
-    const dLat =
-        deg2rad(
-            lat2 - lat1
-        );
+    const toRad = deg => deg * Math.PI / 180;
+    const dLat = toRad(bLat - aLat);
+    const dLon = toRad(bLon - aLon);
 
-    const dLon =
-        deg2rad(
-            lon2 - lon1
-        );
+    const sinLat = Math.sin(dLat / 2);
+    const sinLon = Math.sin(dLon / 2);
 
+    const h =
+        sinLat * sinLat +
+        Math.cos(toRad(aLat)) *
+        Math.cos(toRad(bLat)) *
+        sinLon * sinLon;
 
-    const a =
-        Math.sin(
-            dLat / 2
-        ) *
-        Math.sin(
-            dLat / 2
-        ) +
-
-        Math.cos(
-            deg2rad(lat1)
-        ) *
-        Math.cos(
-            deg2rad(lat2)
-        ) *
-
-        Math.sin(
-            dLon / 2
-        ) *
-        Math.sin(
-            dLon / 2
-        );
-
-
-    const c =
-        2 *
-        Math.atan2(
-            Math.sqrt(a),
-            Math.sqrt(
-                1 - a
-            )
-        );
-
-
-    return R * c;
+    return 6371 * 2 * Math.atan2(Math.sqrt(h), Math.sqrt(1 - h));
 }
 
 
@@ -3482,7 +3458,7 @@ ${remaining}
 ${success}%
 
 🚶‍♂️ المسافة:
-${totalDistance.toFixed(2)} كم
+${formatRouteDistance(totalDistance)}
 
 --------------------------------
 
@@ -3618,6 +3594,45 @@ updateConnection();
         updateLiveClock();
         setInterval(updateLiveClock, 1000);
     })();
+
+
+
+function getValidParcelCoords(parcel) {
+    if (!parcel || typeof parcel !== "object") return null;
+
+    const lat = Number(
+        parcel.lat ??
+        parcel.latitude ??
+        parcel.coordinates?.lat ??
+        parcel.coordinates?.latitude
+    );
+
+    const lon = Number(
+        parcel.lon ??
+        parcel.lng ??
+        parcel.longitude ??
+        parcel.coordinates?.lon ??
+        parcel.coordinates?.lng ??
+        parcel.coordinates?.longitude
+    );
+
+    if (
+        !Number.isFinite(lat) ||
+        !Number.isFinite(lon) ||
+        Math.abs(lat) > 90 ||
+        Math.abs(lon) > 180
+    ) {
+        return null;
+    }
+
+    return { lat, lon };
+}
+
+function formatRouteDistance(km) {
+    if (!Number.isFinite(km) || km < 0) return "—";
+    if (km < 1) return `${Math.round(km * 1000)} م`;
+    return `${formatRouteDistance(km)}`;
+}
 
 </script>
 
