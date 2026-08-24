@@ -2110,6 +2110,16 @@ function getAddress(
 }
 
 
+function getEl(id) {
+    return document.getElementById(id);
+}
+
+function setDisplay(id, value) {
+    const el = getEl(id);
+    if (el) el.style.display = value;
+    return el;
+}
+
 function updateUI() {
 
     const listEl =
@@ -2117,11 +2127,7 @@ function updateUI() {
             "parcelsList"
         );
 
-
-    let emptyMsg =
-        document.getElementById(
-            "emptyMsg"
-        );
+    if (!listEl) return;
 
 
     const total =
@@ -2185,17 +2191,13 @@ function updateUI() {
         " كم";
 
 
-    // Clearing the list removes #emptyMsg from the DOM.
-    // Recreate it when needed instead of keeping a stale/null reference.
     listEl.innerHTML = "";
 
     if (!total) {
-        emptyMsg = document.createElement("p");
-        emptyMsg.id = "emptyMsg";
-        emptyMsg.className = "empty";
-        emptyMsg.textContent = "ما في طرود مضافة. ابدأ الإدخال!";
-        emptyMsg.style.display = "block";
-        listEl.appendChild(emptyMsg);
+        const msg = document.createElement("p");
+        msg.className = "empty";
+        msg.textContent = "ما في طرود مضافة. ابدأ الإدخال!";
+        listEl.appendChild(msg);
         return;
     }
 
@@ -2729,16 +2731,11 @@ function optimizeRoute() {
 
     if (!first) {
 
-        document.getElementById(
-            "nextStop"
-        ).style.display =
-            "block";
-
-
-        document.getElementById(
-            "nextStop"
-        ).innerHTML =
-            "ℹ️ لتحسين المسار بدقة نحتاج إحداثيات الطرود. يمكن استخدام عنوان Google Maps لكل طرد.";
+        const nextStop = getEl("nextStop");
+        if (nextStop) {
+            nextStop.style.display = "block";
+            nextStop.innerHTML = "ℹ️ لتحسين المسار بدقة نحتاج إحداثيات الطرود. يمكن استخدام عنوان Google Maps لكل طرد.";
+        }
 
         return;
     }
@@ -2753,15 +2750,10 @@ function optimizeRoute() {
         );
 
 
-    document.getElementById(
-        "nextStop"
-    ).style.display =
-        "block";
-
-
-    document.getElementById(
-        "nextStop"
-    ).innerHTML = `
+    const nextStop = getEl("nextStop");
+    if (!nextStop) return;
+    nextStop.style.display = "block";
+    nextStop.innerHTML = `
 
         <b>
             📍 أقرب طرد:
@@ -2792,16 +2784,8 @@ function optimizeRoute() {
    LOADING
 ===================================================== */
 
-function showLoading(
-    show
-) {
-
-    document.getElementById(
-        "loading"
-    ).style.display =
-        show
-            ? "block"
-            : "none";
+function showLoading(show) {
+    setDisplay("loading", show ? "block" : "none");
 }
 
 
