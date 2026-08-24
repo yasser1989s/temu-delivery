@@ -1,23 +1,23 @@
-const CACHE_NAME = "pro-delivery-v1";
+const CACHE_NAME = "pro-delivery-v3";
 
-const APP_SHELL = [
+const APP_FILES = [
   "./",
   "./index.html",
-  "./assets/styles.css",
+  "./manifest.json",
   "./assets/app.js",
-  "./manifest.json"
+  "./assets/styles.css"
 ];
 
+// تثبيت Service Worker
 self.addEventListener("install", event => {
   event.waitUntil(
-    caches.open(CACHE_NAME).then(cache => {
-      return cache.addAll(APP_SHELL);
-    })
+    caches.open(CACHE_NAME)
+      .then(cache => cache.addAll(APP_FILES))
+      .then(() => self.skipWaiting())
   );
-
-  self.skipWaiting();
 });
 
+// تفعيل النسخة الجديدة
 self.addEventListener("activate", event => {
   event.waitUntil(
     caches.keys().then(keys =>
@@ -26,43 +26,86 @@ self.addEventListener("activate", event => {
           .filter(key => key !== CACHE_NAME)
           .map(key => caches.delete(key))
       )
-    )
+    ).then(() => self.clients.claim())
   );
-
-  self.clients.claim();
 });
 
+// التعامل مع الطلبات
 self.addEventListener("fetch", event => {
   const request = event.request;
 
-  if (request.method !== "GET") return;
+  // تجاهل أي شيء ليس HTTP/HTTPS
+  if (
+    request.method !== "GET" ||
+    !["http:", "https:"].includes(new URL(request.url).protocol)
+  ) {
+    return;
+  }
+
+  // تجاهل طلبات Chrome Extensions
+  if (request.url.startsWith("chrome-extension://")) {
+    return;
+  }
 
   event.respondWith(
     caches.match(request).then(cachedResponse => {
+
       if (cachedResponse) {
+        // استخدم النسخة المخزنة فوراً
+        // وفي نفس الوقت حاول تحديثها بالخلفية
+        event.waitUntil(
+          fetch(request)
+            .then(response => {
+              if (
+                response &&
+                response.ok &&
+                response.type === "basic"
+              ) {
+                return caches.open(CACHE_NAME).then(cache => {
+                  return cache.put(request, response.clone());
+                });
+              }
+            })
+            .catch(() => {})
+        );
+
         return cachedResponse;
       }
 
+      // إذا لم يكن موجوداً في Cache
       return fetch(request)
-        .then(networkResponse => {
+        .then(response => {
+
           if (
-            !networkResponse ||
-            networkResponse.status !== 200 ||
-            networkResponse.type === "opaque"
+            response &&
+            response.ok &&
+            response.type === "basic"
           ) {
-            return networkResponse;
+            const copy = response.clone();
+
+            caches.open(CACHE_NAME).then(cache => {
+              cache.put(request, copy).catch(() => {});
+            });
           }
 
-          const copy = networkResponse.clone();
-
-          caches.open(CACHE_NAME).then(cache => {
-            cache.put(request, copy);
-          });
-
-          return networkResponse;
+          return response;
         })
         .catch(() => {
-          return caches.match("./index.html");
+
+          // إذا انقطع الإنترنت
+          if (request.mode === "navigate") {
+            return caches.match("./index.html");
+          }
+
+          return new Response(
+            "Offline",
+            {
+              status: 503,
+              headers: {
+                "Content-Type": "text/plain; charset=utf-8"
+              }
+            }
+          );
         });
     })
   );
