@@ -1544,5 +1544,194 @@ function announce(text) {
     );
   } catch {}
 }
+// ============================================
+// AI CAMERA ADDRESS SCANNER
+// ============================================
 
+const AI_BACKEND_URL =
+  "ضع_هنا_رابط_الـBackend_الخاص_بك";
+
+const aiScanBtn =
+  document.getElementById("aiScanBtn");
+
+const aiCameraInput =
+  document.getElementById("aiCameraInput");
+
+if (aiScanBtn && aiCameraInput) {
+
+  aiScanBtn.addEventListener("click", () => {
+    aiCameraInput.click();
+  });
+
+  aiCameraInput.addEventListener(
+    "change",
+    async event => {
+
+      const file =
+        event.target.files?.[0];
+
+      event.target.value = "";
+
+      if (!file) return;
+
+      try {
+
+        loading(true);
+
+        aiScanBtn.disabled = true;
+
+        aiScanBtn.textContent =
+          "🤖 جاري قراءة الورقة...";
+
+        const imageData =
+          await fileToDataURL(file);
+
+        const result =
+          await analyzeAddressWithAI(
+            imageData
+          );
+
+        console.log(
+          "AI RESULT:",
+          result
+        );
+
+        // إنشاء طرد جديد وتعبئة البيانات
+        openParcelModal({
+          ...newParcel(),
+
+          name:
+            result.name || "",
+
+          street:
+            result.street || "",
+
+          house:
+            result.house || "",
+
+          zip:
+            result.zip || "",
+
+          city:
+            result.city || "",
+
+          phone:
+            result.phone || "",
+
+          barcode:
+            result.barcode || "",
+
+          rawAddress:
+            result.raw_text || ""
+        });
+
+      } catch (error) {
+
+        console.error(error);
+
+        alert(
+          "تعذر تحليل الصورة:\n\n" +
+          error.message
+        );
+
+      } finally {
+
+        loading(false);
+
+        aiScanBtn.disabled =
+          false;
+
+        aiScanBtn.textContent =
+          "🤖 📷 قراءة العنوان بالـAI";
+      }
+    }
+  );
+}
+
+
+// --------------------------------------------
+// File → Base64
+// --------------------------------------------
+
+function fileToDataURL(file) {
+
+  return new Promise(
+    (resolve, reject) => {
+
+      const reader =
+        new FileReader();
+
+      reader.onload = () =>
+        resolve(reader.result);
+
+      reader.onerror = () =>
+        reject(
+          new Error(
+            "تعذر قراءة الصورة."
+          )
+        );
+
+      reader.readAsDataURL(file);
+    }
+  );
+}
+
+
+// --------------------------------------------
+// Send image to backend
+// --------------------------------------------
+
+async function analyzeAddressWithAI(
+  imageData
+) {
+
+  const response =
+    await fetch(
+      AI_BACKEND_URL,
+      {
+        method: "POST",
+
+        headers: {
+          "Content-Type":
+            "application/json"
+        },
+
+        body: JSON.stringify({
+          image: imageData
+        })
+      }
+    );
+
+  if (!response.ok) {
+
+    let message =
+      "AI backend error";
+
+    try {
+
+      const data =
+        await response.json();
+
+      message =
+        data.error ||
+        message;
+
+    } catch {}
+
+    throw new Error(message);
+  }
+
+  const data =
+    await response.json();
+
+  if (!data.success) {
+
+    throw new Error(
+      data.error ||
+      "فشل تحليل الصورة."
+    );
+  }
+
+  return data.data;
+}
 init();
