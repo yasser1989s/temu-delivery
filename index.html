@@ -275,18 +275,6 @@
             border: 1px solid #64748b;
         }
 
-
-        .history-btn { background:#0f766e; }
-        .signature-btn { background:#8b5cf6; }
-        .proof-action-btn { background:#7c3aed; }
-        .history-grid { display:grid; grid-template-columns:1fr; gap:8px; max-height:60vh; overflow:auto; }
-        .history-card { background:#0f172a; border:1px solid #334155; border-radius:10px; padding:10px; }
-        .history-proof { width:100%; max-height:220px; object-fit:contain; border-radius:8px; margin-top:7px; background:#fff; }
-        .signature-preview { width:100%; max-height:120px; object-fit:contain; background:#fff; border-radius:8px; margin-top:7px; }
-        .signature-pad { width:100%; height:220px; background:#fff; border:2px solid #475569; border-radius:10px; touch-action:none; display:block; }
-        .history-meta { color:#94a3b8; font-size:11px; line-height:1.7; }
-        .proof-status { color:#86efac; font-size:11px; }
-
         .empty {
             text-align: center;
             color: #64748b;
@@ -406,20 +394,6 @@
             margin-bottom: 8px;
         }
 
-
-        .batch-btn { background:linear-gradient(135deg,#f59e0b,#ea580c); }
-        .batch-panel { background:#0f172a; border:1px solid #475569; border-radius:10px; padding:10px; margin-bottom:8px; }
-        .batch-progress { height:9px; background:#334155; border-radius:99px; overflow:hidden; margin:7px 0; }
-        .batch-progress > div { height:100%; width:0%; background:#22c55e; transition:width .25s; }
-        .route-card { background:#0f172a; border:1px solid #334155; border-radius:9px; padding:9px; margin-bottom:7px; }
-        .route-card.current { border-color:#22c55e; box-shadow:0 0 0 1px #22c55e55; }
-        .route-num { display:inline-flex; width:28px; height:28px; align-items:center; justify-content:center; border-radius:50%; background:#2563eb; font-weight:bold; margin-left:6px; }
-        .route-distance { color:#38bdf8; font-weight:bold; }
-        .route-time { color:#fbbf24; }
-        .batch-small { font-size:11px; color:#94a3b8; line-height:1.7; }
-        .batch-preview { display:grid; grid-template-columns:repeat(4,1fr); gap:5px; max-height:170px; overflow:auto; }
-        .batch-preview img { width:100%; aspect-ratio:1; object-fit:cover; border-radius:6px; border:1px solid #475569; background:#fff; }
-
         .next-stop {
             background: #172554;
             border: 1px solid #2563eb;
@@ -436,6 +410,28 @@
 
 
 <body>
+
+<div class="card">
+    <button
+        id="optimizeRouteButton"
+        class="action-main-btn"
+        style="background:#16a34a;"
+        onclick="optimizeDeliveryRoute()"
+    >
+        🚚 📍 ترتيب الطرود حسب الأقرب لموقعي
+    </button>
+
+    <div style="
+        font-size:11px;
+        color:#94a3b8;
+        text-align:center;
+        line-height:1.5;
+    ">
+        يحدد موقعك، يحوّل عناوين الطرود إلى إحداثيات،
+        ثم يرتبها من الأقرب إلى الأبعد.
+    </div>
+</div>
+
 
     <h1>📦 Pro Delivery</h1>
 
@@ -576,22 +572,6 @@
         </button>
 
 
-
-        <button
-            class="action-main-btn batch-btn"
-            onclick="openBatchScanner()"
-        >
-            📸  تصوير مجموعة الطرود — Batch Scan
-        </button>
-
-        <input
-            id="batchCameraInput"
-            type="file"
-            accept="image/*"
-            capture="environment"
-            hidden
-        >
-
         <!-- Optimize -->
 
         <button
@@ -610,14 +590,6 @@
             onclick="generateReport()"
         >
             📊 تقرير نهاية اليوم
-        </button>
-
-
-        <button
-            class="action-main-btn history-btn"
-            onclick="openDeliveryHistory()"
-        >
-            🕘 History — الطرود المستلمة
         </button>
 
 
@@ -696,89 +668,6 @@
 
     </div>
 
-
-
-    <!-- Batch Scan Modal -->
-    <div id="batchModal" class="modal">
-        <div class="modal-content">
-            <h3>📸 Batch Scan — تصوير مجموعة الطرود</h3>
-            <div class="batch-panel">
-                <div id="batchStatus">جاهز لتصوير أول طرد.</div>
-                <div class="batch-progress"><div id="batchProgressBar"></div></div>
-                <div class="batch-small" id="batchCounter">0 صورة</div>
-            </div>
-            <div class="batch-preview" id="batchPreview"></div>
-            <div class="btn-group" style="margin-top:8px;">
-                <button class="action-btn proof-action-btn" onclick="captureBatchParcel()">📷 تصوير طرد</button>
-                <button class="action-btn deliver-btn" onclick="processBatchScans()">🤖 تحليل الكل</button>
-                <button class="action-btn edit-btn" onclick="clearBatchScans()">🧹 مسح</button>
-            </div>
-            <div id="batchResults" style="margin-top:8px;"></div>
-            <div class="btn-group" style="margin-top:8px;">
-                <button class="action-btn" style="background:#2563eb;" onclick="buildBatchRoute()">🚀 ترتيب المسار</button>
-                <button class="action-btn close-btn" onclick="closeBatchScanner()">إغلاق</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- Route Modal -->
-    <div id="routeModal" class="modal">
-        <div class="modal-content">
-            <h3>🚀 ترتيب التسليم</h3>
-            <div id="routeSummary" class="batch-panel"></div>
-            <div id="routeList"></div>
-            <div class="btn-group" style="margin-top:8px;">
-                <button class="action-btn deliver-btn" onclick="showNextStop()">📍 الطرد التالي</button>
-                <button class="action-btn close-btn" onclick="closeRouteModal()">إغلاق</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- Modal سجل التسليم -->
-    <div id="historyModal" class="modal">
-        <div class="modal-content">
-            <h3>🕘 سجل الطرود المستلمة</h3>
-            <div id="historyList" class="history-grid"></div>
-            <div class="modal-buttons">
-                <button class="modal-btn close-btn" onclick="closeDeliveryHistory()">إغلاق</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- Modal توقيع المستلم -->
-    <div id="signatureModal" class="modal">
-        <div class="modal-content">
-            <h3>✍️ توقيع المستلم</h3>
-            <p id="signatureParcelLabel" style="font-size:12px;color:#94a3b8;"></p>
-            <canvas id="signaturePad" class="signature-pad"></canvas>
-            <div class="btn-group" style="margin-top:8px;">
-                <button class="action-btn edit-btn" onclick="clearSignaturePad()">🧹 مسح</button>
-                <button class="action-btn signature-btn" onclick="saveSignature()">💾 حفظ التوقيع</button>
-            </div>
-            <div class="modal-buttons">
-                <button class="modal-btn close-btn" onclick="closeSignatureModal()">إلغاء</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- Modal تأكيد التسليم -->
-    <div id="deliveryProofModal" class="modal">
-        <div class="modal-content">
-            <h3>✅ تأكيد التسليم</h3>
-            <p id="deliveryProofLabel" style="font-size:12px;color:#94a3b8;"></p>
-            <div class="btn-group">
-                <button class="action-btn wa-btn" onclick="sendDeliveryWhatsApp(currentDeliveryIndex)">🟢 WhatsApp</button>
-                <button class="action-btn proof-action-btn" onclick="takeProof(currentDeliveryIndex); closeDeliveryProofModal();">📸 صورة التسليم</button>
-                <button class="action-btn signature-btn" onclick="openSignature(currentDeliveryIndex); closeDeliveryProofModal();">✍️ توقيع المستلم</button>
-            </div>
-            <div class="btn-group" style="margin-top:8px;">
-                <button class="action-btn deliver-btn" onclick="completeDelivery(currentDeliveryIndex, true)">💾 تأكيد وحفظ</button>
-            </div>
-            <div class="modal-buttons">
-                <button class="modal-btn close-btn" onclick="closeDeliveryProofModal()">إغلاق</button>
-            </div>
-        </div>
-    </div>
 
     <!-- Modal إضافة/تعديل طرد -->
 
@@ -1049,6 +938,9 @@ initAI();
 
 const AI_BACKEND_URL =
     "https://pro-delivery-ai.yasserkhalil.workers.dev";
+
+const GEOCODE_BACKEND_URL =
+    AI_BACKEND_URL + "/geocode";
 
 
 function initAI() {
@@ -1378,31 +1270,6 @@ function saveParcelForm() {
         proofUrl:
             index !== ""
                 ? parcels[index].proofUrl
-                : null,
-
-        proofTakenAt:
-            index !== ""
-                ? parcels[index].proofTakenAt
-                : null,
-
-        signatureUrl:
-            index !== ""
-                ? parcels[index].signatureUrl
-                : null,
-
-        signatureAt:
-            index !== ""
-                ? parcels[index].signatureAt
-                : null,
-
-        deliveredAt:
-            index !== ""
-                ? parcels[index].deliveredAt
-                : null,
-
-        whatsappPreparedAt:
-            index !== ""
-                ? parcels[index].whatsappPreparedAt
                 : null
     };
 
@@ -1937,140 +1804,146 @@ function startVoiceInput() {
    BARCODE / QR
 ===================================================== */
 
-let zxingLoaded = false;
-let zxingLoading = null;
-
-async function loadZXing() {
-    if (zxingLoaded && window.ZXingBrowser) return;
-    if (zxingLoading) return zxingLoading;
-
-    zxingLoading = new Promise((resolve, reject) => {
-        const existing = document.querySelector('script[data-zxing-browser]');
-        if (existing) {
-            existing.addEventListener('load', () => {
-                zxingLoaded = !!window.ZXingBrowser;
-                zxingLoaded ? resolve() : reject(new Error('ZXing لم يتم تحميله'));
-            }, { once: true });
-            existing.addEventListener('error', () => reject(new Error('تعذر تحميل مكتبة قراءة Barcode/QR')), { once: true });
-            return;
-        }
-
-        const script = document.createElement('script');
-        script.src = 'https://cdn.jsdelivr.net/npm/@zxing/browser@0.1.5/umd/index.min.js';
-        script.async = true;
-        script.dataset.zxingBrowser = '1';
-        script.onload = () => {
-            zxingLoaded = !!window.ZXingBrowser;
-            zxingLoaded ? resolve() : reject(new Error('ZXing لم يتم تحميله'));
-        };
-        script.onerror = () => reject(new Error('تعذر تحميل مكتبة قراءة Barcode/QR'));
-        document.head.appendChild(script);
-    });
-
-    return zxingLoading;
-}
-
-function closeBarcodeScanner(video, stream, controls, overlay) {
-    try {
-        if (controls && typeof controls.stop === 'function') controls.stop();
-    } catch {}
-    try {
-        if (stream) stream.getTracks().forEach(track => track.stop());
-    } catch {}
-    try {
-        if (video) video.remove();
-        if (overlay) overlay.remove();
-    } catch {}
-}
-
 async function scanBarcode() {
-    let overlay = null;
-    let video = null;
-    let controls = null;
-    let stream = null;
 
-    try {
-        await loadZXing();
+    if (
+        !("BarcodeDetector" in window)
+    ) {
 
-        if (!navigator.mediaDevices?.getUserMedia) {
-            throw new Error('هذا المتصفح لا يسمح بالوصول إلى الكاميرا. افتح الموقع عبر HTTPS.');
-        }
-
-        overlay = document.createElement('div');
-        overlay.style.cssText = `
-            position:fixed; inset:0; z-index:10000;
-            background:#000; display:flex; flex-direction:column;
-            align-items:center; justify-content:center;
-        `;
-
-        video = document.createElement('video');
-        video.setAttribute('playsinline', 'true');
-        video.autoplay = true;
-        video.muted = true;
-        video.style.cssText = `
-            width:100%; height:100%; object-fit:cover;
-        `;
-
-        const closeBtn = document.createElement('button');
-        closeBtn.textContent = '✕ إغلاق';
-        closeBtn.style.cssText = `
-            position:absolute; top:24px; right:18px; z-index:2;
-            border:0; border-radius:14px; padding:12px 18px;
-            background:rgba(0,0,0,.65); color:#fff; font-size:18px;
-        `;
-
-        const hint = document.createElement('div');
-        hint.textContent = 'وجّه الكاميرا نحو Barcode أو QR';
-        hint.style.cssText = `
-            position:absolute; bottom:30px; left:18px; right:18px;
-            z-index:2; text-align:center; color:#fff;
-            background:rgba(0,0,0,.65); border-radius:14px;
-            padding:14px; font-size:17px;
-        `;
-
-        overlay.appendChild(video);
-        overlay.appendChild(closeBtn);
-        overlay.appendChild(hint);
-        document.body.appendChild(overlay);
-
-        closeBtn.onclick = () => closeBarcodeScanner(video, stream, controls, overlay);
-
-        const Reader = window.ZXingBrowser?.BrowserMultiFormatReader;
-        if (!Reader) throw new Error('قارئ Barcode/QR غير متاح.');
-
-        const reader = new Reader();
-
-        controls = await reader.decodeFromConstraints(
-            {
-                video: {
-                    facingMode: { ideal: 'environment' },
-                    width: { ideal: 1280 },
-                    height: { ideal: 720 }
-                },
-                audio: false
-            },
-            video,
-            (result, error) => {
-                if (!result) return;
-
-                const value = result.getText?.() || result.text || '';
-                if (!value) return;
-
-                closeBarcodeScanner(video, stream, controls, overlay);
-
-                openParcelForm({
-                    barcode: value,
-                    raw_text: value
-                });
-            }
+        alert(
+            "BarcodeDetector غير مدعوم في هذا المتصفح. استخدم Chrome حديث."
         );
 
-        // ZXing owns the stream. Keep a reference when available.
-        stream = video.srcObject || null;
+        return;
+    }
 
-    } catch (error) {
-        closeBarcodeScanner(video, stream, controls, overlay);
-        alert('تعذر تشغيل قارئ Barcode / QR:\n\n' + (error?.message || error));
+
+    try {
+
+        const stream =
+            await navigator
+                .mediaDevices
+                .getUserMedia({
+                    video: {
+                        facingMode:
+                            "environment"
+                    }
+                });
+
+
+        const video =
+            document.createElement(
+                "video"
+            );
+
+
+        video.style.position =
+            "fixed";
+
+        video.style.inset =
+            "0";
+
+        video.style.width =
+            "100%";
+
+        video.style.height =
+            "100%";
+
+        video.style.objectFit =
+            "cover";
+
+        video.style.zIndex =
+            "9999";
+
+        video.autoplay =
+            true;
+
+        video.playsInline =
+            true;
+
+        document.body.appendChild(
+            video
+        );
+
+
+        video.srcObject =
+            stream;
+
+
+        const detector =
+            new BarcodeDetector({
+                formats: [
+                    "qr_code",
+                    "code_128",
+                    "ean_13",
+                    "ean_8",
+                    "pdf417",
+                    "data_matrix",
+                    "aztec",
+                    "upc_a",
+                    "upc_e"
+                ]
+            });
+
+
+        const scan =
+            async () => {
+
+                try {
+
+                    const codes =
+                        await detector.detect(
+                            video
+                        );
+
+
+                    if (
+                        codes.length
+                    ) {
+
+                        const value =
+                            codes[0]
+                                .rawValue;
+
+
+                        stream
+                            .getTracks()
+                            .forEach(
+                                track =>
+                                    track.stop()
+                            );
+
+
+                        video.remove();
+
+
+                        openParcelForm({
+                            barcode:
+                                value
+                        });
+
+
+                        return;
+                    }
+
+                } catch {}
+
+
+                requestAnimationFrame(
+                    scan
+                );
+            };
+
+
+        scan();
+
+
+    } catch(error) {
+
+        alert(
+            "تعذر فتح الكاميرا: " +
+            error.message
+        );
     }
 }
 
@@ -2558,158 +2431,20 @@ function updateUI() {
    DELIVERED
 ===================================================== */
 
-function markDelivered(index) {
-    currentDeliveryIndex = index;
-    const parcel = parcels[index];
-    parcel.status = "delivered";
-    parcel.deliveredAt = parcel.deliveredAt || new Date().toISOString();
+function markDelivered(
+    index
+) {
+
+    parcels[index].status =
+        "delivered";
+
+
+    parcels[index].deliveredAt =
+        new Date()
+            .toISOString();
+
+
     saveAndSync();
-
-    const label = document.getElementById("deliveryProofLabel");
-    if (label) label.textContent = `${parcel.name || "مستلم"} — ${getAddress(parcel)}`;
-    document.getElementById("deliveryProofModal").classList.add("show");
-}
-
-function completeDelivery(index, sendWhatsApp = true) {
-    if (index == null || !parcels[index]) return;
-    const parcel = parcels[index];
-    parcel.status = "delivered";
-    parcel.deliveredAt = parcel.deliveredAt || new Date().toISOString();
-    parcel.confirmedAt = new Date().toISOString();
-    saveAndSync();
-    closeDeliveryProofModal();
-    if (sendWhatsApp && parcel.phone) sendDeliveryWhatsApp(index);
-    updateUI();
-}
-
-function closeDeliveryProofModal() {
-    document.getElementById("deliveryProofModal").classList.remove("show");
-}
-
-function normalizeGermanPhone(phone) {
-    let p = String(phone || "").trim().replace(/[^0-9+]/g, "");
-    if (p.startsWith("00")) p = "+" + p.slice(2);
-    if (p.startsWith("0")) p = "+49" + p.slice(1);
-    if (p.startsWith("49")) p = "+" + p;
-    return p;
-}
-
-function sendDeliveryWhatsApp(index) {
-    const parcel = parcels[index];
-    if (!parcel) return;
-    const phone = normalizeGermanPhone(parcel.phone);
-    if (!phone) {
-        alert("لا يوجد رقم هاتف لهذا الطرد.");
-        return;
-    }
-    const address = getAddress(parcel);
-    const time = parcel.deliveredAt ? new Date(parcel.deliveredAt).toLocaleString("de-DE") : new Date().toLocaleString("de-DE");
-    const text = `Hallo ${parcel.name || ""},
-
-Ihr Paket wurde erfolgreich zugestellt.
-📦 ${parcel.barcode || ""}
-📍 ${address}
-🕒 ${time}
-
-Vielen Dank!`;
-    const url = `https://wa.me/${phone.replace(/\D/g, "")}?text=${encodeURIComponent(text)}`;
-    parcel.whatsappPreparedAt = new Date().toISOString();
-    saveAndSync();
-    window.open(url, "_blank");
-}
-
-function openDeliveryHistory() {
-    const list = document.getElementById("historyList");
-    const delivered = parcels.filter(p => p.status === "delivered").sort((a,b) => new Date(b.deliveredAt || 0) - new Date(a.deliveredAt || 0));
-    if (!delivered.length) {
-        list.innerHTML = '<div class="empty">لا توجد طرود مستلمة بعد.</div>';
-    } else {
-        list.innerHTML = delivered.map(parcel => {
-            const index = parcels.indexOf(parcel);
-            const date = parcel.deliveredAt ? new Date(parcel.deliveredAt).toLocaleString("de-DE") : "غير مسجل";
-            return `<div class="history-card">
-                <strong>📦 ${escapeHTML(parcel.name || "بدون اسم")}</strong>
-                <div class="history-meta">📍 ${escapeHTML(getAddress(parcel))}<br>📞 ${escapeHTML(parcel.phone || "بدون هاتف")}<br>🕒 ${escapeHTML(date)}<br>🔳 ${escapeHTML(parcel.barcode || "بدون Barcode")}</div>
-                ${parcel.proofUrl ? `<img class="history-proof" src="${parcel.proofUrl}" alt="Proof of delivery">` : '<div class="history-meta">📸 لا توجد صورة تسليم</div>'}
-                ${parcel.signatureUrl ? `<img class="signature-preview" src="${parcel.signatureUrl}" alt="Signature">` : '<div class="history-meta">✍️ لا يوجد توقيع</div>'}
-                <div class="proof-status">${parcel.whatsappPreparedAt ? "🟢 رسالة WhatsApp جاهزة" : "⚪ لم يتم فتح رسالة WhatsApp"}</div>
-                <div class="btn-group" style="margin-top:7px;">
-                    ${parcel.phone ? `<button class="action-btn wa-btn" onclick="sendDeliveryWhatsApp(${index})">🟢 إرسال WhatsApp</button>` : ""}
-                    <button class="action-btn proof-action-btn" onclick="takeProof(${index})">📸 صورة</button>
-                    <button class="action-btn signature-btn" onclick="openSignature(${index})">✍️ توقيع</button>
-                </div>
-            </div>`;
-        }).join("");
-    }
-    document.getElementById("historyModal").classList.add("show");
-}
-
-function closeDeliveryHistory() {
-    document.getElementById("historyModal").classList.remove("show");
-}
-
-let currentDeliveryIndex = null;
-let signatureIndex = null;
-let signatureDrawing = false;
-let signatureCtx = null;
-
-function openSignature(index) {
-    signatureIndex = index;
-    const parcel = parcels[index];
-    document.getElementById("signatureParcelLabel").textContent = `${parcel.name || "المستلم"} — ${getAddress(parcel)}`;
-    document.getElementById("signatureModal").classList.add("show");
-    setTimeout(() => setupSignaturePad(parcel.signatureUrl), 50);
-}
-
-function setupSignaturePad(existing) {
-    const canvas = document.getElementById("signaturePad");
-    const rect = canvas.getBoundingClientRect();
-    const dpr = window.devicePixelRatio || 1;
-    canvas.width = Math.max(1, Math.floor(rect.width * dpr));
-    canvas.height = Math.max(1, Math.floor(rect.height * dpr));
-    signatureCtx = canvas.getContext("2d");
-    signatureCtx.scale(dpr, dpr);
-    signatureCtx.lineWidth = 2.5;
-    signatureCtx.lineCap = "round";
-    signatureCtx.strokeStyle = "#111827";
-    if (existing) {
-        const img = new Image();
-        img.onload = () => signatureCtx.drawImage(img, 0, 0, rect.width, rect.height);
-        img.src = existing;
-    }
-    const point = e => {
-        const r = canvas.getBoundingClientRect();
-        return { x: e.clientX - r.left, y: e.clientY - r.top };
-    };
-    canvas.onpointerdown = e => { signatureDrawing = true; canvas.setPointerCapture(e.pointerId); const p = point(e); signatureCtx.beginPath(); signatureCtx.moveTo(p.x,p.y); };
-    canvas.onpointermove = e => { if (!signatureDrawing) return; const p = point(e); signatureCtx.lineTo(p.x,p.y); signatureCtx.stroke(); };
-    canvas.onpointerup = () => signatureDrawing = false;
-    canvas.onpointercancel = () => signatureDrawing = false;
-}
-
-function clearSignaturePad() {
-    const canvas = document.getElementById("signaturePad");
-    if (!signatureCtx) return;
-    const r = canvas.getBoundingClientRect();
-    signatureCtx.clearRect(0, 0, r.width, r.height);
-}
-
-function saveSignature() {
-    if (signatureIndex == null || !parcels[signatureIndex]) return;
-    const canvas = document.getElementById("signaturePad");
-    const data = canvas.toDataURL("image/png");
-    parcels[signatureIndex].signatureUrl = data;
-    parcels[signatureIndex].signatureAt = new Date().toISOString();
-    parcels[signatureIndex].status = "delivered";
-    parcels[signatureIndex].deliveredAt = parcels[signatureIndex].deliveredAt || new Date().toISOString();
-    saveAndSync();
-    closeSignatureModal();
-    alert("تم حفظ توقيع المستلم.");
-}
-
-function closeSignatureModal() {
-    document.getElementById("signatureModal").classList.remove("show");
-    signatureIndex = null;
 }
 
 
@@ -2837,37 +2572,70 @@ function editParcel(
    PROOF OF DELIVERY
 ===================================================== */
 
-function takeProof(index) {
-    const input = document.createElement("input");
-    input.type = "file";
-    input.accept = "image/*";
-    input.capture = "environment";
-    input.onchange = event => {
-        const file = event.target.files?.[0];
-        if (!file) return;
-        const reader = new FileReader();
-        reader.onload = function(event) {
-            const img = new Image();
-            img.onload = function() {
-                const max = 1400;
-                const scale = Math.min(1, max / Math.max(img.width, img.height));
-                const canvas = document.createElement("canvas");
-                canvas.width = Math.round(img.width * scale);
-                canvas.height = Math.round(img.height * scale);
-                const ctx = canvas.getContext("2d");
-                ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-                parcels[index].proofUrl = canvas.toDataURL("image/jpeg", 0.78);
-                parcels[index].proofTakenAt = new Date().toISOString();
-                parcels[index].status = "delivered";
-                parcels[index].deliveredAt = parcels[index].deliveredAt || new Date().toISOString();
-                saveAndSync();
-                updateUI();
-                alert("تم حفظ صورة التسليم.");
-            };
-            img.src = event.target.result;
+function takeProof(
+    index
+) {
+
+    const input =
+        document.createElement(
+            "input"
+        );
+
+
+    input.type =
+        "file";
+
+    input.accept =
+        "image/*";
+
+    input.capture =
+        "environment";
+
+
+    input.onchange =
+        event => {
+
+            const file =
+                event.target.files?.[0];
+
+
+            if (!file)
+                return;
+
+
+            const reader =
+                new FileReader();
+
+
+            reader.onload =
+                function(event) {
+
+                    parcels[index]
+                        .proofUrl =
+                        event.target.result;
+
+
+                    parcels[index]
+                        .status =
+                        "delivered";
+
+
+                    parcels[index]
+                        .deliveredAt =
+                        new Date()
+                            .toISOString();
+
+
+                    saveAndSync();
+                };
+
+
+            reader.readAsDataURL(
+                file
+            );
         };
-        reader.readAsDataURL(file);
-    };
+
+
     input.click();
 }
 
@@ -2876,10 +2644,7 @@ function takeProof(index) {
    ROUTE
 ===================================================== */
 
-async function optimizeRoute() {
-    if (BATCH_GEOCODE_BACKEND_URL && navigator.onLine) {
-        await geocodeMissingParcels();
-    }
+function optimizeRoute() {
 
     if (
         !parcels.length
@@ -2997,328 +2762,6 @@ async function optimizeRoute() {
     `;
 }
 
-
-
-/* =====================================================
-   BATCH SCAN + ROUTE PLANNER
-===================================================== */
-
-let batchScans = [];
-let batchRoute = [];
-let batchRouteIndex = 0;
-const BATCH_GEOCODE_BACKEND_URL = "https://pro-delivery-ai.yasserkhalil.workers.dev/geocode";
-
-function openBatchScanner() {
-    document.getElementById("batchModal").classList.add("show");
-    renderBatchPreview();
-}
-
-function closeBatchScanner() {
-    document.getElementById("batchModal").classList.remove("show");
-}
-
-function clearBatchScans() {
-    if (batchScans.length && !confirm("حذف صور Batch الحالية؟")) return;
-    batchScans = [];
-    batchRoute = [];
-    batchRouteIndex = 0;
-    renderBatchPreview();
-    document.getElementById("batchResults").innerHTML = "";
-}
-
-function captureBatchParcel() {
-    const input = document.getElementById("batchCameraInput");
-    input.value = "";
-    input.onchange = async () => {
-        const file = input.files?.[0];
-        if (!file) return;
-        try {
-            const compressed = await compressImageForBatch(file);
-            batchScans.push({ image: compressed, status: "queued" });
-            renderBatchPreview();
-            document.getElementById("batchStatus").textContent = `تم تصوير الطرد ${batchScans.length}. صوّر التالي أو اضغط تحليل الكل.`;
-        } catch (e) {
-            alert("تعذر حفظ صورة الطرد: " + e.message);
-        }
-    };
-    input.click();
-}
-
-function compressImageForBatch(file) {
-    return new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onerror = () => reject(new Error("تعذر قراءة الصورة"));
-        reader.onload = () => {
-            const img = new Image();
-            img.onerror = () => reject(new Error("الصورة غير صالحة"));
-            img.onload = () => {
-                const max = 1280;
-                const scale = Math.min(1, max / Math.max(img.width, img.height));
-                const canvas = document.createElement("canvas");
-                canvas.width = Math.max(1, Math.round(img.width * scale));
-                canvas.height = Math.max(1, Math.round(img.height * scale));
-                const ctx = canvas.getContext("2d", {alpha:false});
-                ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-                resolve(canvas.toDataURL("image/jpeg", 0.68));
-            };
-            img.src = reader.result;
-        };
-        reader.readAsDataURL(file);
-    });
-}
-
-function renderBatchPreview() {
-    const preview = document.getElementById("batchPreview");
-    preview.innerHTML = batchScans.map((x,i) => `<div title="${x.status}"><img src="${x.image}" alt="${i+1}"></div>`).join("");
-    document.getElementById("batchCounter").textContent = `${batchScans.length} صورة`;
-    document.getElementById("batchProgressBar").style.width = Math.min(100, batchScans.length) + "%";
-}
-
-async function processBatchScans() {
-    if (!batchScans.length) { alert("صوّر طردًا واحدًا على الأقل أولًا."); return; }
-    const results = document.getElementById("batchResults");
-    results.innerHTML = "";
-    let completed = 0;
-    document.getElementById("batchStatus").textContent = `🤖 جاري تحليل 0 / ${batchScans.length}`;
-
-    // حدّ أقصى طلبين بالتوازي لتقليل الضغط على Gemini.
-    let cursor = 0;
-    async function worker() {
-        while (cursor < batchScans.length) {
-            const i = cursor++;
-            try {
-                const data = await analyzeAddressWithAI(batchScans[i].image);
-                batchScans[i].data = data || {};
-                batchScans[i].status = "done";
-            } catch (e) {
-                batchScans[i].status = "error";
-                batchScans[i].error = e.message;
-            }
-            completed++;
-            document.getElementById("batchStatus").textContent = `🤖 جاري تحليل ${completed} / ${batchScans.length}`;
-            document.getElementById("batchProgressBar").style.width = Math.round(completed / batchScans.length * 100) + "%";
-            renderBatchResults();
-        }
-    }
-    await Promise.all([worker(), worker()]);
-    renderBatchResults();
-    document.getElementById("batchStatus").textContent = `✅ انتهى التحليل: ${batchScans.filter(x=>x.status==='done').length} / ${batchScans.length}`;
-}
-
-function renderBatchResults() {
-    const el = document.getElementById("batchResults");
-    el.innerHTML = batchScans.map((x,i) => {
-        if (x.status === "error") return `<div class="route-card">🔴 #${i+1} فشل: ${escapeHTML(x.error || "خطأ")}</div>`;
-        if (x.status !== "done") return `<div class="route-card">⏳ #${i+1} قيد التحليل...</div>`;
-        const d = x.data || {};
-        const addr = [d.street && ((d.street||"") + (d.house ? " " + d.house : "")), [d.zip,d.city].filter(Boolean).join(" ")].filter(Boolean).join(", ");
-        return `<div class="route-card">🟢 #${i+1} <b>${escapeHTML(d.name || "بدون اسم")}</b><br><span class="batch-small">${escapeHTML(addr || d.raw_text || "عنوان غير واضح")}</span></div>`;
-    }).join("");
-}
-
-async function buildBatchRoute() {
-    const done = batchScans.filter(x => x.status === "done" && x.data);
-    if (!done.length) { alert("حلّل الصور أولًا."); return; }
-    if (lastLat === null || lastLon === null) {
-        alert("اسمح للموقع بالوصول إلى GPS أولًا، ثم أعد ترتيب المسار.");
-        return;
-    }
-
-    // أضف الطرود الجديدة مرة واحدة، مع منع تكرار Barcode واضح.
-    let added = 0;
-    for (const x of done) {
-        const d = x.data;
-        const barcode = String(d.barcode || "").trim();
-        const duplicate = barcode && parcels.some(p => String(p.barcode || "").trim() === barcode);
-        if (duplicate) continue;
-        parcels.push({
-            id: Date.now() + Math.random(), name:d.name||"", street:d.street||"", house:d.house||"", zip:d.zip||"", city:d.city||"", phone:d.phone||"", barcode, notes:d.raw_text||"", status:"pending", proofUrl:null, proofTakenAt:null, signatureUrl:null, signatureAt:null, deliveredAt:null, whatsappPreparedAt:null, lat:Number.isFinite(+d.lat)?+d.lat:null, lon:Number.isFinite(+d.lon)?+d.lon:null, batchImportedAt:new Date().toISOString()
-        });
-        added++;
-    }
-    saveAndSync();
-
-    // إذا لم توجد إحداثيات من AI، حاول geocoding عبر Worker إن تم ضبطه.
-    if (BATCH_GEOCODE_BACKEND_URL) await geocodeMissingParcels();
-
-    const candidates = parcels.filter(p => (p.status === "pending" || p.status === "reattempt") && Number.isFinite(+p.lat) && Number.isFinite(+p.lon));
-    if (!candidates.length) {
-        alert(`تمت إضافة ${added} طرد. تعذر تحديد إحداثيات العناوين. تحقق من العناوين أو اتصال الإنترنت ثم أعد المحاولة.`);
-        return;
-    }
-
-    batchRoute = nearestNeighborRoute(candidates, lastLat, lastLon);
-    batchRouteIndex = 0;
-    renderRouteModal();
-    document.getElementById("routeModal").classList.add("show");
-}
-
-function nearestNeighborRoute(items, startLat, startLon) {
-    const remaining = items.slice();
-    const ordered = [];
-    let lat = startLat, lon = startLon;
-    while (remaining.length) {
-        let bestIndex = 0, bestDistance = Infinity;
-        for (let i=0;i<remaining.length;i++) {
-            const d = calculateDistance(lat, lon, +remaining[i].lat, +remaining[i].lon);
-            if (d < bestDistance) { bestDistance=d; bestIndex=i; }
-        }
-        const next = remaining.splice(bestIndex,1)[0];
-        next.routeDistanceFromPrevious = bestDistance;
-        ordered.push(next);
-        lat = +next.lat; lon = +next.lon;
-    }
-    return ordered;
-}
-
-function estimatedDriveMinutes(km) {
-    // تقدير حضري تقريبي فقط؛ الملاحة الفعلية من Google Maps أدق حسب الازدحام.
-    return Math.max(1, Math.round((km / 32) * 60));
-}
-
-function renderRouteModal() {
-    const totalKm = batchRoute.reduce((sum,p)=>sum+(p.routeDistanceFromPrevious||0),0);
-    document.getElementById("routeSummary").innerHTML = `🚀 <b>${batchRoute.length}</b> توقفات مرتبة<br>📏 المسافة التقريبية: <b>${totalKm.toFixed(1)} كم</b><br>⏱️ زمن القيادة التقريبي: <b>${estimatedDriveMinutes(totalKm)} دقيقة</b><br><span class="batch-small">الترتيب يعتمد على أقرب مسافة مباشرة بين التوقفات. الملاحة الفعلية والازدحام يحددهما تطبيق الخرائط.</span>`;
-    document.getElementById("routeList").innerHTML = batchRoute.map((p,i)=>{
-        const km = p.routeDistanceFromPrevious||0;
-        const mins = estimatedDriveMinutes(km);
-        const nav = `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(getAddress(p))}&travelmode=driving`;
-        return `<div class="route-card ${i===batchRouteIndex?'current':''}"><div><span class="route-num">${i+1}</span><b>${escapeHTML(p.name||"بدون اسم")}</b></div><div class="batch-small">📍 ${escapeHTML(getAddress(p))}<br>📏 <span class="route-distance">${km.toFixed(2)} كم</span> · ⏱️ <span class="route-time">~${mins} دقيقة</span></div><div class="btn-group" style="margin-top:6px;"><a class="action-btn map-btn" href="${nav}" target="_blank" rel="noopener">🧭 الملاحة</a><button class="action-btn deliver-btn" onclick="selectRouteStop(${i})">📦 هذا الطرد</button></div></div>`;
-    }).join("");
-}
-
-function selectRouteStop(i) {
-    batchRouteIndex = i;
-    const p = batchRoute[i];
-    const idx = parcels.indexOf(p);
-    document.getElementById("routeModal").classList.remove("show");
-    if (idx >= 0) {
-        document.getElementById("nextStop").style.display = "block";
-        const km = p.routeDistanceFromPrevious || calculateDistance(lastLat,lastLon,+p.lat,+p.lon);
-        document.getElementById("nextStop").innerHTML = `<b>🚀 الطرد التالي #${i+1}</b><br>${escapeHTML(p.name||"بدون اسم")}<br>${escapeHTML(getAddress(p))}<br>📏 ${km.toFixed(2)} كم · ⏱️ ~${estimatedDriveMinutes(km)} دقيقة <div class="btn-group" style="margin-top:6px;"><button class="action-btn deliver-btn" onclick="markDelivered(${idx})">✅ تسليم</button><a class="action-btn map-btn" target="_blank" rel="noopener" href="https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(getAddress(p))}&travelmode=driving">🧭 ملاحة</a></div>`;
-    }
-}
-
-function showNextStop() {
-    selectRouteStop(batchRouteIndex);
-}
-
-function closeRouteModal() { document.getElementById("routeModal").classList.remove("show"); }
-
-async function geocodeMissingParcels() {
-    const targets = parcels.filter(
-        p =>
-            (p.status === "pending" || p.status === "reattempt") &&
-            (!Number.isFinite(+p.lat) || !Number.isFinite(+p.lon))
-    );
-
-    if (!targets.length) return;
-
-    let cache = {};
-    try {
-        cache = JSON.parse(localStorage.getItem("pro_delivery_geocode_cache_v1") || "{}") || {};
-    } catch {}
-
-    const normalizeAddress = p =>
-        getAddress(p).trim().toLowerCase().replace(/\s+/g, " ");
-
-    const unresolved = [];
-
-    for (const p of targets) {
-        const key = normalizeAddress(p);
-        const cached = cache[key];
-
-        if (cached && Number.isFinite(+cached.lat) && Number.isFinite(+cached.lon)) {
-            p.lat = +cached.lat;
-            p.lon = +cached.lon;
-            p.geocodeProvider = cached.provider || "Photon";
-            continue;
-        }
-
-        unresolved.push(p);
-    }
-
-    if (!unresolved.length) {
-        saveAndSync();
-        return;
-    }
-
-    const status = document.getElementById("batchStatus");
-    let completed = targets.length - unresolved.length;
-
-    if (status) {
-        status.textContent =
-            `📍 تحديد مواقع العناوين: ${completed} / ${targets.length}`;
-    }
-
-    let cursor = 0;
-    const concurrency = Math.min(3, unresolved.length);
-
-    async function geocodeOne(p) {
-        const address = getAddress(p);
-
-        if (!address || address === "عنوان غير مكتمل") return;
-
-        try {
-            const url =
-                BATCH_GEOCODE_BACKEND_URL +
-                "?q=" + encodeURIComponent(address) +
-                "&lat=" + encodeURIComponent(lastLat ?? "") +
-                "&lon=" + encodeURIComponent(lastLon ?? "");
-
-            let response = await fetch(url, { method: "GET" });
-
-            if (response.status === 429) {
-                await new Promise(r => setTimeout(r, 900));
-                response = await fetch(url, { method: "GET" });
-            }
-
-            if (!response.ok) return;
-
-            const d = await response.json();
-
-            if (Number.isFinite(+d.lat) && Number.isFinite(+d.lon)) {
-                p.lat = +d.lat;
-                p.lon = +d.lon;
-                p.geocodeProvider = d.provider || "Photon";
-
-                cache[normalizeAddress(p)] = {
-                    lat: p.lat,
-                    lon: p.lon,
-                    provider: p.geocodeProvider,
-                    savedAt: new Date().toISOString()
-                };
-            }
-        } catch (e) {
-            console.warn("Geocoding failed:", address, e);
-        } finally {
-            completed++;
-
-            if (status) {
-                status.textContent =
-                    `📍 تحديد مواقع العناوين: ${completed} / ${targets.length}`;
-            }
-        }
-    }
-
-    async function worker() {
-        while (cursor < unresolved.length) {
-            const i = cursor++;
-            await geocodeOne(unresolved[i]);
-        }
-    }
-
-    await Promise.all(
-        Array.from({ length: concurrency }, () => worker())
-    );
-
-    localStorage.setItem(
-        "pro_delivery_geocode_cache_v1",
-        JSON.stringify(cache)
-    );
-
-    saveAndSync();
-}
 
 /* =====================================================
    LOADING
@@ -3482,9 +2925,13 @@ window.addEventListener(
         }
 
 
-        if (event.target.id === "reportModal") closeReportModal();
-        if (event.target.id === "batchModal") closeBatchScanner();
-        if (event.target.id === "routeModal") closeRouteModal();
+        if (
+            event.target.id ===
+            "reportModal"
+        ) {
+
+            closeReportModal();
+        }
 
     }
 );
@@ -3516,6 +2963,464 @@ window.addEventListener(
 );
 
 updateConnection();
+
+
+/* =====================================================
+   ROUTE / GEOCODING
+   ===================================================== */
+
+function getParcelAddress(parcel) {
+    const parts = [
+        parcel.street || "",
+        parcel.houseNumber || parcel.house || "",
+        parcel.postalCode || parcel.zip || "",
+        parcel.city || "",
+        parcel.country || "Germany"
+    ]
+        .map(v => String(v || "").trim())
+        .filter(Boolean);
+
+    if (!parts.length && parcel.address) {
+        return String(parcel.address).trim();
+    }
+
+    return [...new Set(parts)].join(", ");
+}
+
+async function geocodeParcel(parcel) {
+    const address = getParcelAddress(parcel);
+
+    if (!address || address.length < 4) return false;
+
+    if (
+        Number.isFinite(Number(parcel.lat)) &&
+        Number.isFinite(Number(parcel.lon))
+    ) {
+        return true;
+    }
+
+    let cache = {};
+    try {
+        cache = JSON.parse(
+            localStorage.getItem("pro_delivery_geocode_cache_v1") || "{}"
+        ) || {};
+    } catch (e) {}
+
+    const cacheKey = address
+        .trim()
+        .toLowerCase()
+        .replace(/\s+/g, " ");
+
+    const cached = cache[cacheKey];
+
+    if (
+        cached &&
+        Number.isFinite(Number(cached.lat)) &&
+        Number.isFinite(Number(cached.lon))
+    ) {
+        parcel.lat = Number(cached.lat);
+        parcel.lon = Number(cached.lon);
+        parcel.geocodeProvider =
+            cached.provider || "Nominatim / OpenStreetMap";
+        return true;
+    }
+
+    const response = await fetch(
+        GEOCODE_BACKEND_URL +
+        "?q=" + encodeURIComponent(address) +
+        "&lat=" + encodeURIComponent(lastLat ?? "") +
+        "&lon=" + encodeURIComponent(lastLon ?? "")
+    );
+
+    if (!response.ok) return false;
+
+    const data = await response.json();
+
+    if (
+        !data.success ||
+        !Number.isFinite(Number(data.lat)) ||
+        !Number.isFinite(Number(data.lon))
+    ) {
+        return false;
+    }
+
+    parcel.lat = Number(data.lat);
+    parcel.lon = Number(data.lon);
+    parcel.geocodeProvider =
+        data.provider || "Nominatim / OpenStreetMap";
+
+    cache[cacheKey] = {
+        lat: parcel.lat,
+        lon: parcel.lon,
+        provider: parcel.geocodeProvider,
+        savedAt: new Date().toISOString()
+    };
+
+    localStorage.setItem(
+        "pro_delivery_geocode_cache_v1",
+        JSON.stringify(cache)
+    );
+
+    return true;
+}
+
+function haversineDistanceKm(lat1, lon1, lat2, lon2) {
+    const R = 6371;
+    const toRad = value =>
+        Number(value) * Math.PI / 180;
+
+    const dLat = toRad(lat2 - lat1);
+    const dLon = toRad(lon2 - lon1);
+
+    const a =
+        Math.sin(dLat / 2) ** 2 +
+        Math.cos(toRad(lat1)) *
+        Math.cos(toRad(lat2)) *
+        Math.sin(dLon / 2) ** 2;
+
+    return 2 * R * Math.asin(Math.sqrt(a));
+}
+
+function getCurrentPositionForRoute() {
+    return new Promise((resolve, reject) => {
+
+        if (!navigator.geolocation) {
+            reject(new Error(
+                "هذا الجهاز لا يدعم تحديد الموقع."
+            ));
+            return;
+        }
+
+        navigator.geolocation.getCurrentPosition(
+            position => {
+
+                lastLat = position.coords.latitude;
+                lastLon = position.coords.longitude;
+
+                localStorage.setItem(
+                    "last_lat",
+                    String(lastLat)
+                );
+
+                localStorage.setItem(
+                    "last_lon",
+                    String(lastLon)
+                );
+
+                resolve(position);
+            },
+            error => {
+
+                if (error.code === 1) {
+                    reject(new Error(
+                        "صلاحية الموقع مرفوضة. اسمح للموقع باستخدام GPS من إعدادات المتصفح."
+                    ));
+                } else {
+                    reject(new Error(
+                        "تعذر الحصول على موقعك الحالي."
+                    ));
+                }
+            },
+            {
+                enableHighAccuracy: true,
+                timeout: 15000,
+                maximumAge: 30000
+            }
+        );
+    });
+}
+
+async function prepareParcelCoordinates() {
+
+    const active = parcels.filter(
+        p =>
+            p.status !== "delivered" &&
+            p.status !== "cancelled"
+    );
+
+    if (!active.length) {
+        throw new Error(
+            "لا توجد طرود نشطة."
+        );
+    }
+
+    const loading =
+        document.getElementById("loading");
+
+    let completed = 0;
+
+    if (loading) {
+        loading.style.display = "block";
+        loading.textContent =
+            `📍 تحديد مواقع الطرود: 0 / ${active.length}`;
+    }
+
+    for (const parcel of active) {
+
+        try {
+            await geocodeParcel(parcel);
+        } catch (error) {
+            console.warn(
+                "Geocoding failed:",
+                error
+            );
+        }
+
+        completed++;
+
+        if (loading) {
+            loading.textContent =
+                `📍 تحديد مواقع الطرود: ${completed} / ${active.length}`;
+        }
+
+        // Nominatim public service: one request at a time.
+        if (completed < active.length) {
+            await new Promise(
+                resolve => setTimeout(resolve, 1100)
+            );
+        }
+    }
+
+    if (typeof saveParcels === "function") {
+        saveParcels();
+    } else {
+        localStorage.setItem(
+            "saved_parcels",
+            JSON.stringify(parcels)
+        );
+    }
+
+    if (loading) {
+        loading.textContent =
+            "✅ تم تحديد مواقع الطرود.";
+    }
+
+    return active;
+}
+
+async function optimizeDeliveryRoute() {
+
+    try {
+
+        await getCurrentPositionForRoute();
+
+        const active =
+            await prepareParcelCoordinates();
+
+        const located =
+            active.filter(
+                p =>
+                    Number.isFinite(Number(p.lat)) &&
+                    Number.isFinite(Number(p.lon))
+            );
+
+        if (!located.length) {
+            throw new Error(
+                "لم يتم العثور على إحداثيات صالحة للطرود. تحقق من العناوين."
+            );
+        }
+
+        const remaining =
+            located.map(parcel => ({
+                parcel
+            }));
+
+        const route = [];
+
+        let currentLat =
+            Number(lastLat);
+
+        let currentLon =
+            Number(lastLon);
+
+        while (remaining.length) {
+
+            let bestIndex = 0;
+            let bestDistance = Infinity;
+
+            for (
+                let i = 0;
+                i < remaining.length;
+                i++
+            ) {
+
+                const p =
+                    remaining[i].parcel;
+
+                const distance =
+                    haversineDistanceKm(
+                        currentLat,
+                        currentLon,
+                        Number(p.lat),
+                        Number(p.lon)
+                    );
+
+                if (distance < bestDistance) {
+                    bestDistance = distance;
+                    bestIndex = i;
+                }
+            }
+
+            const selected =
+                remaining.splice(
+                    bestIndex,
+                    1
+                )[0].parcel;
+
+            selected.routeDistanceKm =
+                Number(bestDistance.toFixed(2));
+
+            selected.routeOrder =
+                route.length + 1;
+
+            route.push(selected);
+
+            currentLat =
+                Number(selected.lat);
+
+            currentLon =
+                Number(selected.lon);
+        }
+
+        const inactive =
+            parcels.filter(
+                p =>
+                    p.status === "delivered" ||
+                    p.status === "cancelled"
+            );
+
+        parcels =
+            [...route, ...inactive];
+
+        if (typeof saveParcels === "function") {
+            saveParcels();
+        } else {
+            localStorage.setItem(
+                "saved_parcels",
+                JSON.stringify(parcels)
+            );
+        }
+
+        if (typeof updateUI === "function") {
+            updateUI();
+        }
+
+        renderRoutePanel(route);
+
+        return route;
+
+    } catch (error) {
+
+        console.error(
+            "Route optimization error:",
+            error
+        );
+
+        alert(
+            error.message ||
+            "تعذر ترتيب مسار التسليم."
+        );
+
+        return [];
+    }
+}
+
+function renderRoutePanel(route) {
+
+    let panel =
+        document.getElementById("routeResult");
+
+    if (!panel) {
+
+        panel =
+            document.createElement("div");
+
+        panel.id =
+            "routeResult";
+
+        panel.className =
+            "card";
+
+        const firstCard =
+            document.querySelector(".card");
+
+        if (firstCard) {
+            firstCard.parentNode.insertBefore(
+                panel,
+                firstCard.nextSibling
+            );
+        } else {
+            document.body.prepend(panel);
+        }
+    }
+
+    if (!route.length) {
+        panel.innerHTML =
+            "<strong>لا توجد طرود قابلة للترتيب.</strong>";
+        return;
+    }
+
+    const next =
+        route.find(
+            p =>
+                p.status !== "delivered" &&
+                p.status !== "cancelled"
+        );
+
+    let html =
+        "<h3 style='color:#38bdf8;margin-top:0'>🚚 ترتيب التسليم</h3>";
+
+    if (next) {
+
+        html += `
+            <div style="
+                background:#172554;
+                border:1px solid #2563eb;
+                padding:10px;
+                border-radius:8px;
+                margin-bottom:10px;
+            ">
+                <strong>🟢 الطرد التالي</strong><br>
+                ${escapeRouteText(getParcelAddress(next))}<br>
+                📍 ${Number(next.routeDistanceKm || 0).toFixed(2)} km
+                <br>
+                🔢 رقم ${next.routeOrder}
+            </div>
+        `;
+    }
+
+    html += route.map(
+        (p, index) => `
+            <div style="
+                padding:8px;
+                border-bottom:1px solid #334155;
+            ">
+                <strong>
+                    ${index + 1}.
+                    ${escapeRouteText(getParcelAddress(p))}
+                </strong>
+                <br>
+                📏 ${Number(
+                    p.routeDistanceKm || 0
+                ).toFixed(2)} km
+            </div>
+        `
+    ).join("");
+
+    panel.innerHTML = html;
+}
+
+function escapeRouteText(value) {
+    return String(value || "")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+}
+
+window.optimizeDeliveryRoute =
+    optimizeDeliveryRoute;
 
 </script>
 
