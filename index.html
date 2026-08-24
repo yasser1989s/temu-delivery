@@ -405,33 +405,77 @@
             display: none;
         }
 
+
+        .menu-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 5px;
+            margin-bottom: 8px;
+        }
+
+        .menu-btn {
+            background: #334155;
+            color: #fff;
+            border: 1px solid #475569;
+            border-radius: 7px;
+            padding: 9px 4px;
+            font-weight: bold;
+            font-size: 11px;
+            cursor: pointer;
+        }
+
+        .menu-btn.active {
+            background: #0369a1;
+            border-color: #38bdf8;
+        }
+
+        .section-count {
+            color: #38bdf8;
+            font-weight: bold;
+        }
+
+        .route-order {
+            background: #172554;
+            color: #93c5fd;
+            border: 1px solid #2563eb;
+            padding: 3px 6px;
+            border-radius: 4px;
+            font-size: 10px;
+        }
+
+        .proof-large {
+            width: 100%;
+            max-height: 260px;
+            object-fit: contain;
+            background: #0f172a;
+            border-radius: 7px;
+            border: 1px solid #475569;
+            margin-top: 6px;
+        }
+
+        .details-box {
+            background: #0f172a;
+            border: 1px solid #334155;
+            padding: 8px;
+            border-radius: 7px;
+            line-height: 1.8;
+            font-size: 12px;
+        }
+
+        .signature-pad {
+            width: 100%;
+            height: 160px;
+            background: white;
+            border-radius: 7px;
+            touch-action: none;
+            display: block;
+        }
+
     </style>
 </head>
 
 
 <body>
-
-<div class="card">
-    <button
-        id="optimizeRouteButton"
-        class="action-main-btn"
-        style="background:#16a34a;"
-        onclick="optimizeDeliveryRoute()"
-    >
-        🚚 📍 ترتيب الطرود حسب الأقرب لموقعي
-    </button>
-
-    <div style="
-        font-size:11px;
-        color:#94a3b8;
-        text-align:center;
-        line-height:1.5;
-    ">
-        يحدد موقعك، يحوّل عناوين الطرود إلى إحداثيات،
-        ثم يرتبها من الأقرب إلى الأبعد.
-    </div>
-</div>
-
 
     <h1>📦 Pro Delivery</h1>
 
@@ -619,6 +663,37 @@
     ></div>
 
 
+    <div class="card" style="padding:7px;">
+        <div class="menu-grid">
+            <button class="menu-btn active" id="menuRouteBtn" onclick="showParcelSection('route')">🚚 المسار</button>
+            <button class="menu-btn" id="menuTodayBtn" onclick="showParcelSection('today')">📅 طرود اليوم</button>
+            <button class="menu-btn" id="menuAllBtn" onclick="showParcelSection('all')">📦 كل الطرود</button>
+        </div>
+        <button class="menu-btn" id="menuHistoryBtn" style="width:100%;" onclick="showParcelSection('history')">🕘 History / الطرود المستلمة</button>
+    </div>
+
+    <div id="sectionRoute" class="card">
+        <h3 style="margin:0 0 7px;">🚚 مسار التسليم</h3>
+        <div id="routeList"></div>
+    </div>
+
+    <div id="sectionToday" class="card" style="display:none;">
+        <h3 style="margin:0 0 7px;">📅 طرود اليوم <span class="section-count" id="todayCount">0</span></h3>
+        <div id="todayList"></div>
+    </div>
+
+    <div id="sectionAll" class="card" style="display:none;">
+        <h3 style="margin:0 0 7px;">📦 كل الطرود <span class="section-count" id="allCount">0</span></h3>
+        <div id="allList"></div>
+    </div>
+
+    <div id="sectionHistory" class="card" style="display:none;">
+        <h3 style="margin:0 0 7px;">🕘 الطرود المستلمة <span class="section-count" id="historyCount">0</span></h3>
+        <div id="historyList"></div>
+    </div>
+
+
+
     <!-- الطرود -->
 
     <div
@@ -641,7 +716,7 @@
                     font-size:13px;
                 "
             >
-                الطرود بالشنطة:
+                قائمة البيانات الأساسية:
             </h3>
 
             <button
@@ -941,6 +1016,368 @@ const AI_BACKEND_URL =
 
 const GEOCODE_BACKEND_URL =
     AI_BACKEND_URL + "/geocode";
+
+let activeParcelSection = "route";
+
+function parcelCreatedDate(parcel) {
+    return parcel.createdAt || parcel.addedAt || parcel.created_at || null;
+}
+
+function isTodayParcel(parcel) {
+    const raw = parcelCreatedDate(parcel);
+    if (!raw) return false;
+    const d = new Date(raw);
+    if (Number.isNaN(d.getTime())) return false;
+    const now = new Date();
+    return (
+        d.getFullYear() === now.getFullYear() &&
+        d.getMonth() === now.getMonth() &&
+        d.getDate() === now.getDate()
+    );
+}
+
+function ensureParcelDates() {
+    let changed = false;
+    parcels.forEach(p => {
+        if (!parcelCreatedDate(p)) {
+            p.createdAt = new Date().toISOString();
+            changed = true;
+        }
+    });
+    if (changed) {
+        localStorage.setItem("saved_parcels", JSON.stringify(parcels));
+    }
+}
+
+function normalizePhone(phone) {
+    let p = String(phone || "").trim();
+    if (!p) return "";
+    p = p.replace(/[^\d+]/g, "");
+    if (p.startsWith("00")) p = "+" + p.slice(2);
+    if (p.startsWith("0") && !p.startsWith("00")) {
+        p = "+49" + p.slice(1);
+    }
+    return p;
+}
+
+function formatDateTime(value) {
+    if (!value) return "غير مسجل";
+    const d = new Date(value);
+    if (Number.isNaN(d.getTime())) return String(value);
+    return d.toLocaleString("de-DE", {
+        dateStyle: "short",
+        timeStyle: "short"
+    });
+}
+
+function openWhatsApp(parcel, delivered = false) {
+    const phone = normalizePhone(parcel.phone);
+    if (!phone) {
+        alert("لا يوجد رقم هاتف لهذا الطرد.");
+        return;
+    }
+
+    const text = delivered
+        ? "Hallo, Ihr Paket wurde erfolgreich zugestellt. Vielen Dank!"
+        : "Hallo, ich bin gerade in Ihrer Straße und habe Ihr Paket dabei.";
+
+    window.open(
+        "https://wa.me/" +
+        phone.replace(/\D/g, "") +
+        "?text=" +
+        encodeURIComponent(text),
+        "_blank"
+    );
+}
+
+function openNavigation(parcel) {
+    const address = getAddress(parcel);
+    const query =
+        Number.isFinite(Number(parcel.lat)) &&
+        Number.isFinite(Number(parcel.lon))
+            ? `${parcel.lat},${parcel.lon}`
+            : address;
+
+    window.open(
+        "https://www.google.com/maps/dir/?api=1&destination=" +
+        encodeURIComponent(query),
+        "_blank"
+    );
+}
+
+function sendDeliveryWhatsApp(parcel) {
+    openWhatsApp(parcel, true);
+}
+
+function showParcelSection(section) {
+    activeParcelSection = section;
+
+    ["route", "today", "all", "history"].forEach(name => {
+        const el = document.getElementById("section" + name.charAt(0).toUpperCase() + name.slice(1));
+        if (el) el.style.display = name === section ? "block" : "none";
+
+        const btn = document.getElementById("menu" + name.charAt(0).toUpperCase() + name.slice(1) + "Btn");
+        if (btn) btn.classList.toggle("active", name === section);
+    });
+
+    renderAdvancedLists();
+}
+
+function renderAdvancedLists() {
+    const active = parcels.filter(p => p.status !== "delivered");
+    const today = parcels.filter(isTodayParcel);
+    const history = parcels.filter(p => p.status === "delivered");
+
+    document.getElementById("todayCount").textContent = today.length;
+    document.getElementById("allCount").textContent = parcels.length;
+    document.getElementById("historyCount").textContent = history.length;
+
+    const route = [...active]
+        .filter(p => Number.isFinite(Number(p.lat)) && Number.isFinite(Number(p.lon)))
+        .sort((a,b) => (Number(a.routeOrder || 999999) - Number(b.routeOrder || 999999)));
+
+    renderAdvancedList("routeList", route, true);
+    renderAdvancedList("todayList", today, false);
+    renderAdvancedList("allList", parcels, false);
+    renderAdvancedList("historyList", history, false);
+}
+
+function renderAdvancedList(containerId, list, routeMode) {
+    const box = document.getElementById(containerId);
+    if (!box) return;
+
+    if (!list.length) {
+        box.innerHTML = '<div class="empty">لا توجد طرود هنا.</div>';
+        return;
+    }
+
+    box.innerHTML = list.map(parcel => {
+        const index = parcels.indexOf(parcel);
+        const address = getAddress(parcel);
+        const phone = normalizePhone(parcel.phone);
+
+        let badge = '<span class="status-badge">قيد الانتظار</span>';
+        if (parcel.status === "delivered")
+            badge = '<span class="status-badge status-delivered">✓ تم التسليم</span>';
+        else if (parcel.status === "absent")
+            badge = '<span class="status-badge status-absent">✕ غياب</span>';
+        else if (parcel.status === "reattempt")
+            badge = '<span class="status-badge status-reattempt">🔄 إعادة</span>';
+
+        const proof = parcel.proofUrl
+            ? `<img class="proof-large" src="${escapeHTML(parcel.proofUrl)}" alt="صورة التسليم">`
+            : "";
+
+        const signature = parcel.signatureUrl
+            ? `<img class="proof-large" src="${escapeHTML(parcel.signatureUrl)}" alt="توقيع المستلم">`
+            : "";
+
+        return `
+            <div class="card" style="margin-bottom:7px;background:#334155;">
+                <div class="parcel-info">
+                    <span>
+                        📦 #${index + 1}
+                        ${parcel.barcode ? " · " + escapeHTML(parcel.barcode) : ""}
+                    </span>
+                    ${badge}
+                </div>
+
+                ${routeMode && parcel.routeOrder ? `
+                    <div style="margin:5px 0;">
+                        <span class="route-order">
+                            🔢 المسار ${parcel.routeOrder}
+                            · 📏 ${Number(parcel.routeDistanceKm || 0).toFixed(2)} km
+                        </span>
+                    </div>
+                ` : ""}
+
+                <div class="parcel-info">
+                    👤 ${escapeHTML(parcel.name || "بدون اسم")}
+                </div>
+
+                <div class="address-box">
+                    📍 ${escapeHTML(address)}
+                </div>
+
+                <div class="details-box">
+                    📞 ${escapeHTML(parcel.phone || "بدون هاتف")}
+                    ${parcel.deliveredAt ? `<br>🕐 التسليم: ${formatDateTime(parcel.deliveredAt)}` : ""}
+                    ${parcel.createdAt ? `<br>📅 الإضافة: ${formatDateTime(parcel.createdAt)}` : ""}
+                    ${parcel.notes ? `<br>📝 ${escapeHTML(parcel.notes)}` : ""}
+                </div>
+
+                <div class="btn-group" style="margin-top:6px;">
+                    <button class="action-btn map-btn" onclick="openNavigation(parcels[${index}])">🧭 ملاحة</button>
+
+                    ${phone ? `
+                        <a class="action-btn wa-btn"
+                           href="https://wa.me/${phone.replace(/\D/g,"")}"
+                           target="_blank">💬 WhatsApp</a>
+                        <a class="action-btn"
+                           style="background:#2563eb;"
+                           href="tel:${phone}">📞 اتصال</a>
+                    ` : ""}
+
+                    ${parcel.status !== "delivered" ? `
+                        <button class="action-btn deliver-btn"
+                                onclick="markDelivered(${index})">
+                            ✅ تسليم
+                        </button>
+                    ` : ""}
+
+                    <button class="action-btn proof-btn"
+                            onclick="takeProof(${index})">
+                        📸 صورة
+                    </button>
+
+                    <button class="action-btn"
+                            style="background:#9333ea;"
+                            onclick="openSignaturePad(${index})">
+                        ✍️ توقيع
+                    </button>
+
+                    <button class="action-btn edit-btn"
+                            onclick="editParcel(${index})">
+                        ✏️ تعديل
+                    </button>
+                </div>
+
+                ${parcel.proofUrl ? `
+                    <div style="margin-top:7px;">
+                        <b>📸 صورة التسليم</b>
+                        ${proof}
+                    </div>
+                ` : ""}
+
+                ${parcel.signatureUrl ? `
+                    <div style="margin-top:7px;">
+                        <b>✍️ توقيع المستلم</b>
+                        ${signature}
+                    </div>
+                ` : ""}
+
+                ${parcel.status === "delivered" && phone ? `
+                    <button class="action-main-btn"
+                            style="background:#16a34a;margin-top:7px;"
+                            onclick="sendDeliveryWhatsApp(parcels[${index}])">
+                        💬 إرسال تأكيد التسليم عبر WhatsApp
+                    </button>
+                ` : ""}
+            </div>
+        `;
+    }).join("");
+}
+
+function openSignaturePad(index) {
+    let modal = document.getElementById("signatureModal");
+
+    if (!modal) {
+        modal = document.createElement("div");
+        modal.id = "signatureModal";
+        modal.className = "modal";
+        modal.innerHTML = `
+            <div class="modal-content">
+                <h3>✍️ توقيع المستلم</h3>
+                <canvas id="signatureCanvas" class="signature-pad" width="800" height="320"></canvas>
+                <div class="modal-actions">
+                    <button class="modal-btn" onclick="saveSignature(${index})">✅ حفظ التوقيع</button>
+                    <button class="modal-btn close-btn" onclick="clearSignaturePad()">🗑️ مسح</button>
+                </div>
+                <button class="modal-btn close-btn" style="width:100%;margin-top:6px;" onclick="closeSignaturePad()">إغلاق</button>
+            </div>
+        `;
+        document.body.appendChild(modal);
+
+        const canvas = document.getElementById("signatureCanvas");
+        const ctx = canvas.getContext("2d");
+        ctx.lineWidth = 3;
+        ctx.lineCap = "round";
+        ctx.strokeStyle = "#111827";
+
+        let drawing = false;
+
+        function point(e) {
+            const rect = canvas.getBoundingClientRect();
+            const source = e.touches ? e.touches[0] : e;
+            return {
+                x: (source.clientX - rect.left) * canvas.width / rect.width,
+                y: (source.clientY - rect.top) * canvas.height / rect.height
+            };
+        }
+
+        const start = e => {
+            drawing = true;
+            const p = point(e);
+            ctx.beginPath();
+            ctx.moveTo(p.x, p.y);
+            e.preventDefault();
+        };
+
+        const move = e => {
+            if (!drawing) return;
+            const p = point(e);
+            ctx.lineTo(p.x, p.y);
+            ctx.stroke();
+            e.preventDefault();
+        };
+
+        const stop = () => drawing = false;
+
+        canvas.addEventListener("mousedown", start);
+        canvas.addEventListener("mousemove", move);
+        canvas.addEventListener("mouseup", stop);
+        canvas.addEventListener("mouseleave", stop);
+
+        canvas.addEventListener("touchstart", start, {passive:false});
+        canvas.addEventListener("touchmove", move, {passive:false});
+        canvas.addEventListener("touchend", stop);
+    }
+
+    modal.dataset.index = String(index);
+    modal.classList.add("show");
+}
+
+function clearSignaturePad() {
+    const canvas = document.getElementById("signatureCanvas");
+    if (!canvas) return;
+    canvas.getContext("2d").clearRect(0, 0, canvas.width, canvas.height);
+}
+
+function saveSignature(index) {
+    const canvas = document.getElementById("signatureCanvas");
+    if (!canvas) return;
+
+    const data = canvas.toDataURL("image/png");
+
+    // Save only when the canvas actually contains something.
+    const pixels = canvas.getContext("2d")
+        .getImageData(0, 0, canvas.width, canvas.height).data;
+
+    let hasInk = false;
+    for (let i = 3; i < pixels.length; i += 4) {
+        if (pixels[i] > 0) {
+            hasInk = true;
+            break;
+        }
+    }
+
+    if (!hasInk) {
+        alert("يرجى توقيع المستلم أولًا.");
+        return;
+    }
+
+    parcels[index].signatureUrl = data;
+    parcels[index].signatureAt = new Date().toISOString();
+
+    saveAndSync();
+    closeSignaturePad();
+}
+
+function closeSignaturePad() {
+    const modal = document.getElementById("signatureModal");
+    if (modal) modal.classList.remove("show");
+}
+
 
 
 function initAI() {
@@ -1268,9 +1705,28 @@ function saveParcelForm() {
                 : "pending",
 
         proofUrl:
-            index !== ""
-                ? parcels[index].proofUrl
-                : null
+            existing?.proofUrl || null,
+
+        signatureUrl:
+            existing?.signatureUrl || null,
+
+        signatureAt:
+            existing?.signatureAt || null,
+
+        deliveredAt:
+            existing?.deliveredAt || null,
+
+        lat:
+            existing?.lat ?? null,
+
+        lon:
+            existing?.lon ?? null,
+
+        routeOrder:
+            existing?.routeOrder ?? null,
+
+        routeDistanceKm:
+            existing?.routeDistanceKm ?? null
     };
 
 
@@ -2431,22 +2887,27 @@ function updateUI() {
    DELIVERED
 ===================================================== */
 
-function markDelivered(
-    index
-) {
+function markDelivered(index) {
 
-    parcels[index].status =
-        "delivered";
+    const parcel = parcels[index];
 
-
-    parcels[index].deliveredAt =
-        new Date()
-            .toISOString();
-
+    parcel.status = "delivered";
+    parcel.deliveredAt = new Date().toISOString();
 
     saveAndSync();
-}
 
+    if (parcel.phone) {
+        const sendNow = confirm(
+            "تم حفظ التسليم.\n\nهل تريد إرسال تأكيد التسليم عبر WhatsApp الآن؟"
+        );
+
+        if (sendNow) {
+            sendDeliveryWhatsApp(parcel);
+        }
+    }
+
+    showParcelSection("route");
+}
 
 /* =====================================================
    ABSENT
@@ -2644,124 +3105,274 @@ function takeProof(
    ROUTE
 ===================================================== */
 
-function optimizeRoute() {
+async function geocodeParcelForRoute(parcel) {
+
+    const address = [
+        parcel.street,
+        parcel.house,
+        parcel.zip,
+        parcel.city,
+        "Germany"
+    ].filter(Boolean).join(", ");
+
+    if (!address || address.length < 4) return false;
 
     if (
-        !parcels.length
+        Number.isFinite(Number(parcel.lat)) &&
+        Number.isFinite(Number(parcel.lon))
     ) {
-
-        alert(
-            "أضف طرودًا أولاً."
-        );
-
-        return;
+        return true;
     }
 
+    let cache = {};
+    try {
+        cache = JSON.parse(
+            localStorage.getItem("pro_delivery_geocode_cache_v1") || "{}"
+        ) || {};
+    } catch {}
+
+    const key = address.toLowerCase().replace(/\s+/g, " ").trim();
 
     if (
-        lastLat === null ||
-        lastLon === null
+        cache[key] &&
+        Number.isFinite(Number(cache[key].lat)) &&
+        Number.isFinite(Number(cache[key].lon))
     ) {
-
-        alert(
-            "اسمح للتطبيق بالوصول إلى موقعك أولاً."
-        );
-
-        return;
+        parcel.lat = Number(cache[key].lat);
+        parcel.lon = Number(cache[key].lon);
+        return true;
     }
 
+    const url =
+        GEOCODE_BACKEND_URL +
+        "?q=" + encodeURIComponent(address) +
+        "&lat=" + encodeURIComponent(lastLat ?? "") +
+        "&lon=" + encodeURIComponent(lastLon ?? "");
 
-    let candidates =
-        parcels.filter(
-            p =>
-                p.status ===
-                    "pending" ||
-                p.status ===
-                    "reattempt"
-        );
+    const response = await fetch(url);
 
+    if (!response.ok) return false;
+
+    const data = await response.json();
 
     if (
-        !candidates.length
+        !data.success ||
+        !Number.isFinite(Number(data.lat)) ||
+        !Number.isFinite(Number(data.lon))
     ) {
-
-        alert(
-            "لا توجد طرود متبقية."
-        );
-
-        return;
+        return false;
     }
 
+    parcel.lat = Number(data.lat);
+    parcel.lon = Number(data.lon);
 
-    const first =
-        candidates
-            .find(
-                p =>
-                    p.lat &&
-                    p.lon
-            );
+    cache[key] = {
+        lat: parcel.lat,
+        lon: parcel.lon,
+        provider: data.provider,
+        savedAt: new Date().toISOString()
+    };
 
+    localStorage.setItem(
+        "pro_delivery_geocode_cache_v1",
+        JSON.stringify(cache)
+    );
 
-    if (!first) {
-
-        document.getElementById(
-            "nextStop"
-        ).style.display =
-            "block";
-
-
-        document.getElementById(
-            "nextStop"
-        ).innerHTML =
-            "ℹ️ لتحسين المسار بدقة نحتاج إحداثيات الطرود. يمكن استخدام عنوان Google Maps لكل طرد.";
-
-        return;
-    }
-
-
-    const distance =
-        calculateDistance(
-            lastLat,
-            lastLon,
-            first.lat,
-            first.lon
-        );
-
-
-    document.getElementById(
-        "nextStop"
-    ).style.display =
-        "block";
-
-
-    document.getElementById(
-        "nextStop"
-    ).innerHTML = `
-
-        <b>
-            📍 أقرب طرد:
-        </b>
-
-        ${escapeHTML(
-            first.name ||
-            "بدون اسم"
-        )}
-
-        <br>
-
-        ${escapeHTML(
-            getAddress(first)
-        )}
-
-        <br>
-
-        المسافة:
-        ${distance.toFixed(2)}
-        كم
-
-    `;
+    return true;
 }
 
+function getCurrentGPS() {
+    return new Promise((resolve, reject) => {
+
+        if (!navigator.geolocation) {
+            reject(new Error("الجهاز لا يدعم GPS."));
+            return;
+        }
+
+        navigator.geolocation.getCurrentPosition(
+            position => {
+                lastLat = position.coords.latitude;
+                lastLon = position.coords.longitude;
+
+                localStorage.setItem("last_lat", lastLat);
+                localStorage.setItem("last_lon", lastLon);
+
+                resolve(position);
+            },
+            error => {
+                reject(new Error(
+                    error.code === 1
+                        ? "اسمح للتطبيق باستخدام موقعك."
+                        : "تعذر الحصول على موقعك الحالي."
+                ));
+            },
+            {
+                enableHighAccuracy: true,
+                timeout: 15000,
+                maximumAge: 30000
+            }
+        );
+    });
+}
+
+async function optimizeRoute() {
+
+    const candidates = parcels.filter(
+        p =>
+            p.status === "pending" ||
+            p.status === "reattempt"
+    );
+
+    if (!candidates.length) {
+        alert("لا توجد طرود متبقية.");
+        return;
+    }
+
+    try {
+
+        await getCurrentGPS();
+
+        showLoading(true);
+
+        let done = 0;
+
+        for (const parcel of candidates) {
+
+            try {
+                await geocodeParcelForRoute(parcel);
+            } catch (e) {
+                console.warn("Geocoding:", e);
+            }
+
+            done++;
+
+            document.getElementById("loading").textContent =
+                `📍 تحديد مواقع الطرود ${done}/${candidates.length}`;
+
+            // Public Nominatim: sequential requests.
+            if (done < candidates.length) {
+                await new Promise(
+                    resolve => setTimeout(resolve, 1100)
+                );
+            }
+        }
+
+        const located = candidates.filter(
+            p =>
+                Number.isFinite(Number(p.lat)) &&
+                Number.isFinite(Number(p.lon))
+        );
+
+        if (!located.length) {
+            throw new Error(
+                "لم يتم العثور على إحداثيات لأي طرد."
+            );
+        }
+
+        const remaining = [...located];
+        const ordered = [];
+
+        let currentLat = Number(lastLat);
+        let currentLon = Number(lastLon);
+
+        while (remaining.length) {
+
+            let bestIndex = 0;
+            let bestDistance = Infinity;
+
+            remaining.forEach((parcel, i) => {
+
+                const d = calculateDistance(
+                    currentLat,
+                    currentLon,
+                    Number(parcel.lat),
+                    Number(parcel.lon)
+                );
+
+                if (d < bestDistance) {
+                    bestDistance = d;
+                    bestIndex = i;
+                }
+            });
+
+            const parcel =
+                remaining.splice(bestIndex, 1)[0];
+
+            parcel.routeOrder =
+                ordered.length + 1;
+
+            parcel.routeDistanceKm =
+                Number(bestDistance.toFixed(2));
+
+            ordered.push(parcel);
+
+            currentLat = Number(parcel.lat);
+            currentLon = Number(parcel.lon);
+        }
+
+        saveAndSync();
+
+        renderAdvancedLists();
+
+        showNextRouteStop(ordered);
+
+        showParcelSection("route");
+
+        document.getElementById("loading").textContent =
+            `✅ تم ترتيب ${ordered.length} طرد.`;
+
+    } catch (error) {
+
+        alert(
+            error.message ||
+            "تعذر ترتيب المسار."
+        );
+
+    } finally {
+
+        setTimeout(
+            () => showLoading(false),
+            1000
+        );
+    }
+}
+
+function showNextRouteStop(ordered) {
+
+    const next =
+        ordered[0] ||
+        parcels.find(
+            p =>
+                p.status === "pending" ||
+                p.status === "reattempt"
+        );
+
+    const box =
+        document.getElementById("nextStop");
+
+    if (!box || !next) return;
+
+    box.style.display = "block";
+
+    box.innerHTML = `
+        <b>🚚 الطرد التالي للتسليم</b><br>
+        👤 ${escapeHTML(next.name || "بدون اسم")}<br>
+        📍 ${escapeHTML(getAddress(next))}<br>
+        ${
+            next.routeDistanceKm != null
+                ? `📏 ${Number(next.routeDistanceKm).toFixed(2)} كم`
+                : ""
+        }
+        <br>
+        <button
+            class="action-btn map-btn"
+            style="margin-top:6px;width:100%;"
+            onclick="openNavigation(parcels[${parcels.indexOf(next)}])"
+        >
+            🧭 ابدأ الملاحة
+        </button>
+    `;
+}
 
 /* =====================================================
    LOADING
@@ -2963,464 +3574,6 @@ window.addEventListener(
 );
 
 updateConnection();
-
-
-/* =====================================================
-   ROUTE / GEOCODING
-   ===================================================== */
-
-function getParcelAddress(parcel) {
-    const parts = [
-        parcel.street || "",
-        parcel.houseNumber || parcel.house || "",
-        parcel.postalCode || parcel.zip || "",
-        parcel.city || "",
-        parcel.country || "Germany"
-    ]
-        .map(v => String(v || "").trim())
-        .filter(Boolean);
-
-    if (!parts.length && parcel.address) {
-        return String(parcel.address).trim();
-    }
-
-    return [...new Set(parts)].join(", ");
-}
-
-async function geocodeParcel(parcel) {
-    const address = getParcelAddress(parcel);
-
-    if (!address || address.length < 4) return false;
-
-    if (
-        Number.isFinite(Number(parcel.lat)) &&
-        Number.isFinite(Number(parcel.lon))
-    ) {
-        return true;
-    }
-
-    let cache = {};
-    try {
-        cache = JSON.parse(
-            localStorage.getItem("pro_delivery_geocode_cache_v1") || "{}"
-        ) || {};
-    } catch (e) {}
-
-    const cacheKey = address
-        .trim()
-        .toLowerCase()
-        .replace(/\s+/g, " ");
-
-    const cached = cache[cacheKey];
-
-    if (
-        cached &&
-        Number.isFinite(Number(cached.lat)) &&
-        Number.isFinite(Number(cached.lon))
-    ) {
-        parcel.lat = Number(cached.lat);
-        parcel.lon = Number(cached.lon);
-        parcel.geocodeProvider =
-            cached.provider || "Nominatim / OpenStreetMap";
-        return true;
-    }
-
-    const response = await fetch(
-        GEOCODE_BACKEND_URL +
-        "?q=" + encodeURIComponent(address) +
-        "&lat=" + encodeURIComponent(lastLat ?? "") +
-        "&lon=" + encodeURIComponent(lastLon ?? "")
-    );
-
-    if (!response.ok) return false;
-
-    const data = await response.json();
-
-    if (
-        !data.success ||
-        !Number.isFinite(Number(data.lat)) ||
-        !Number.isFinite(Number(data.lon))
-    ) {
-        return false;
-    }
-
-    parcel.lat = Number(data.lat);
-    parcel.lon = Number(data.lon);
-    parcel.geocodeProvider =
-        data.provider || "Nominatim / OpenStreetMap";
-
-    cache[cacheKey] = {
-        lat: parcel.lat,
-        lon: parcel.lon,
-        provider: parcel.geocodeProvider,
-        savedAt: new Date().toISOString()
-    };
-
-    localStorage.setItem(
-        "pro_delivery_geocode_cache_v1",
-        JSON.stringify(cache)
-    );
-
-    return true;
-}
-
-function haversineDistanceKm(lat1, lon1, lat2, lon2) {
-    const R = 6371;
-    const toRad = value =>
-        Number(value) * Math.PI / 180;
-
-    const dLat = toRad(lat2 - lat1);
-    const dLon = toRad(lon2 - lon1);
-
-    const a =
-        Math.sin(dLat / 2) ** 2 +
-        Math.cos(toRad(lat1)) *
-        Math.cos(toRad(lat2)) *
-        Math.sin(dLon / 2) ** 2;
-
-    return 2 * R * Math.asin(Math.sqrt(a));
-}
-
-function getCurrentPositionForRoute() {
-    return new Promise((resolve, reject) => {
-
-        if (!navigator.geolocation) {
-            reject(new Error(
-                "هذا الجهاز لا يدعم تحديد الموقع."
-            ));
-            return;
-        }
-
-        navigator.geolocation.getCurrentPosition(
-            position => {
-
-                lastLat = position.coords.latitude;
-                lastLon = position.coords.longitude;
-
-                localStorage.setItem(
-                    "last_lat",
-                    String(lastLat)
-                );
-
-                localStorage.setItem(
-                    "last_lon",
-                    String(lastLon)
-                );
-
-                resolve(position);
-            },
-            error => {
-
-                if (error.code === 1) {
-                    reject(new Error(
-                        "صلاحية الموقع مرفوضة. اسمح للموقع باستخدام GPS من إعدادات المتصفح."
-                    ));
-                } else {
-                    reject(new Error(
-                        "تعذر الحصول على موقعك الحالي."
-                    ));
-                }
-            },
-            {
-                enableHighAccuracy: true,
-                timeout: 15000,
-                maximumAge: 30000
-            }
-        );
-    });
-}
-
-async function prepareParcelCoordinates() {
-
-    const active = parcels.filter(
-        p =>
-            p.status !== "delivered" &&
-            p.status !== "cancelled"
-    );
-
-    if (!active.length) {
-        throw new Error(
-            "لا توجد طرود نشطة."
-        );
-    }
-
-    const loading =
-        document.getElementById("loading");
-
-    let completed = 0;
-
-    if (loading) {
-        loading.style.display = "block";
-        loading.textContent =
-            `📍 تحديد مواقع الطرود: 0 / ${active.length}`;
-    }
-
-    for (const parcel of active) {
-
-        try {
-            await geocodeParcel(parcel);
-        } catch (error) {
-            console.warn(
-                "Geocoding failed:",
-                error
-            );
-        }
-
-        completed++;
-
-        if (loading) {
-            loading.textContent =
-                `📍 تحديد مواقع الطرود: ${completed} / ${active.length}`;
-        }
-
-        // Nominatim public service: one request at a time.
-        if (completed < active.length) {
-            await new Promise(
-                resolve => setTimeout(resolve, 1100)
-            );
-        }
-    }
-
-    if (typeof saveParcels === "function") {
-        saveParcels();
-    } else {
-        localStorage.setItem(
-            "saved_parcels",
-            JSON.stringify(parcels)
-        );
-    }
-
-    if (loading) {
-        loading.textContent =
-            "✅ تم تحديد مواقع الطرود.";
-    }
-
-    return active;
-}
-
-async function optimizeDeliveryRoute() {
-
-    try {
-
-        await getCurrentPositionForRoute();
-
-        const active =
-            await prepareParcelCoordinates();
-
-        const located =
-            active.filter(
-                p =>
-                    Number.isFinite(Number(p.lat)) &&
-                    Number.isFinite(Number(p.lon))
-            );
-
-        if (!located.length) {
-            throw new Error(
-                "لم يتم العثور على إحداثيات صالحة للطرود. تحقق من العناوين."
-            );
-        }
-
-        const remaining =
-            located.map(parcel => ({
-                parcel
-            }));
-
-        const route = [];
-
-        let currentLat =
-            Number(lastLat);
-
-        let currentLon =
-            Number(lastLon);
-
-        while (remaining.length) {
-
-            let bestIndex = 0;
-            let bestDistance = Infinity;
-
-            for (
-                let i = 0;
-                i < remaining.length;
-                i++
-            ) {
-
-                const p =
-                    remaining[i].parcel;
-
-                const distance =
-                    haversineDistanceKm(
-                        currentLat,
-                        currentLon,
-                        Number(p.lat),
-                        Number(p.lon)
-                    );
-
-                if (distance < bestDistance) {
-                    bestDistance = distance;
-                    bestIndex = i;
-                }
-            }
-
-            const selected =
-                remaining.splice(
-                    bestIndex,
-                    1
-                )[0].parcel;
-
-            selected.routeDistanceKm =
-                Number(bestDistance.toFixed(2));
-
-            selected.routeOrder =
-                route.length + 1;
-
-            route.push(selected);
-
-            currentLat =
-                Number(selected.lat);
-
-            currentLon =
-                Number(selected.lon);
-        }
-
-        const inactive =
-            parcels.filter(
-                p =>
-                    p.status === "delivered" ||
-                    p.status === "cancelled"
-            );
-
-        parcels =
-            [...route, ...inactive];
-
-        if (typeof saveParcels === "function") {
-            saveParcels();
-        } else {
-            localStorage.setItem(
-                "saved_parcels",
-                JSON.stringify(parcels)
-            );
-        }
-
-        if (typeof updateUI === "function") {
-            updateUI();
-        }
-
-        renderRoutePanel(route);
-
-        return route;
-
-    } catch (error) {
-
-        console.error(
-            "Route optimization error:",
-            error
-        );
-
-        alert(
-            error.message ||
-            "تعذر ترتيب مسار التسليم."
-        );
-
-        return [];
-    }
-}
-
-function renderRoutePanel(route) {
-
-    let panel =
-        document.getElementById("routeResult");
-
-    if (!panel) {
-
-        panel =
-            document.createElement("div");
-
-        panel.id =
-            "routeResult";
-
-        panel.className =
-            "card";
-
-        const firstCard =
-            document.querySelector(".card");
-
-        if (firstCard) {
-            firstCard.parentNode.insertBefore(
-                panel,
-                firstCard.nextSibling
-            );
-        } else {
-            document.body.prepend(panel);
-        }
-    }
-
-    if (!route.length) {
-        panel.innerHTML =
-            "<strong>لا توجد طرود قابلة للترتيب.</strong>";
-        return;
-    }
-
-    const next =
-        route.find(
-            p =>
-                p.status !== "delivered" &&
-                p.status !== "cancelled"
-        );
-
-    let html =
-        "<h3 style='color:#38bdf8;margin-top:0'>🚚 ترتيب التسليم</h3>";
-
-    if (next) {
-
-        html += `
-            <div style="
-                background:#172554;
-                border:1px solid #2563eb;
-                padding:10px;
-                border-radius:8px;
-                margin-bottom:10px;
-            ">
-                <strong>🟢 الطرد التالي</strong><br>
-                ${escapeRouteText(getParcelAddress(next))}<br>
-                📍 ${Number(next.routeDistanceKm || 0).toFixed(2)} km
-                <br>
-                🔢 رقم ${next.routeOrder}
-            </div>
-        `;
-    }
-
-    html += route.map(
-        (p, index) => `
-            <div style="
-                padding:8px;
-                border-bottom:1px solid #334155;
-            ">
-                <strong>
-                    ${index + 1}.
-                    ${escapeRouteText(getParcelAddress(p))}
-                </strong>
-                <br>
-                📏 ${Number(
-                    p.routeDistanceKm || 0
-                ).toFixed(2)} km
-            </div>
-        `
-    ).join("");
-
-    panel.innerHTML = html;
-}
-
-function escapeRouteText(value) {
-    return String(value || "")
-        .replace(/&/g, "&amp;")
-        .replace(/</g, "&lt;")
-        .replace(/>/g, "&gt;")
-        .replace(/"/g, "&quot;")
-        .replace(/'/g, "&#039;");
-}
-
-window.optimizeDeliveryRoute =
-    optimizeDeliveryRoute;
 
 </script>
 
