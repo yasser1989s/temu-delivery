@@ -917,6 +917,9 @@ initAI();
 const AI_BACKEND_URL =
     "https://pro-delivery-ai.yasserkhalil.workers.dev";
 
+// AI provider: Google Gemini via Cloudflare Worker.
+// Never put GEMINI_API_KEY in this file.
+
 
 function initAI() {
 
@@ -962,7 +965,7 @@ function initAI() {
             button.disabled = true;
 
             button.innerText =
-                "🤖 جاري تحليل الورقة...";
+                "🤖 جاري تحليل العنوان بـGemini...";
 
 
             try {
@@ -1001,7 +1004,7 @@ function initAI() {
                     false;
 
                 button.innerText =
-                    "🤖 📷 قراءة العنوان بالـAI";
+                    "🤖 📷 قراءة العنوان بالـGemini";
             }
 
         }
@@ -1011,58 +1014,31 @@ function initAI() {
 
 function fileToDataURL(file) {
 
-    // ضغط وتصغير صورة الهاتف قبل إرسالها للـWorker
-    // لتقليل الحجم وتسريع التحليل.
-    return new Promise((resolve, reject) => {
+    return new Promise(
+        (resolve, reject) => {
 
-        const img = new Image();
-        const reader = new FileReader();
+            const reader =
+                new FileReader();
 
-        reader.onload = () => {
-            img.onload = () => {
+            reader.onload =
+                () =>
+                    resolve(
+                        reader.result
+                    );
 
-                const maxSide = 2200;
-                const scale = Math.min(
-                    1,
-                    maxSide / Math.max(img.naturalWidth, img.naturalHeight)
-                );
+            reader.onerror =
+                () =>
+                    reject(
+                        new Error(
+                            "تعذر قراءة الصورة."
+                        )
+                    );
 
-                const canvas = document.createElement("canvas");
-                canvas.width = Math.max(1, Math.round(img.naturalWidth * scale));
-                canvas.height = Math.max(1, Math.round(img.naturalHeight * scale));
-
-                const ctx = canvas.getContext("2d", { alpha: false });
-                ctx.drawImage(
-                    img,
-                    0,
-                    0,
-                    canvas.width,
-                    canvas.height
-                );
-
-                resolve(
-                    canvas.toDataURL(
-                        "image/jpeg",
-                        0.86
-                    )
-                );
-            };
-
-            img.onerror = () =>
-                reject(
-                    new Error("تعذر قراءة الصورة.")
-                );
-
-            img.src = reader.result;
-        };
-
-        reader.onerror = () =>
-            reject(
-                new Error("تعذر قراءة الصورة.")
+            reader.readAsDataURL(
+                file
             );
-
-        reader.readAsDataURL(file);
-    });
+        }
+    );
 }
 
 
@@ -1072,79 +1048,71 @@ async function analyzeAddressWithAI(
 
     if (
         !AI_BACKEND_URL ||
-        AI_BACKEND_URL.includes("ضع_هنا")
+        AI_BACKEND_URL.includes(
+            "ضع_هنا"
+        )
     ) {
+
         throw new Error(
-            "رابط الـBackend غير مضبوط في AI_BACKEND_URL."
+            "ضع رابط الـBackend في AI_BACKEND_URL داخل index.html."
         );
     }
 
-    let response;
 
-    try {
-        response = await fetch(
+    const response =
+        await fetch(
             AI_BACKEND_URL,
             {
                 method: "POST",
+
                 headers: {
-                    "Content-Type": "application/json"
+                    "Content-Type":
+                        "application/json"
                 },
+
                 body: JSON.stringify({
                     image: image
                 })
             }
         );
-    } catch (error) {
-        throw new Error(
-            "تعذر الاتصال بـCloudflare Worker. تأكد من الإنترنت ورابط الـBackend."
-        );
-    }
 
-    let data = null;
-    let rawText = "";
-
-    try {
-        rawText = await response.text();
-        data = rawText ? JSON.parse(rawText) : null;
-    } catch (_) {
-        data = null;
-    }
 
     if (!response.ok) {
 
-        const detail =
-            data?.details ||
-            data?.error ||
-            rawText ||
-            "بدون تفاصيل من الخادم.";
+        let message =
+            "فشل الاتصال بالـAI.";
 
-        const status =
-            data?.openai_status
-                ? `OpenAI ${data.openai_status}`
-                : `HTTP ${response.status}`;
+        try {
+
+            const data =
+                await response.json();
+
+            message =
+                data.details ||
+                data.error ||
+                message;
+
+        } catch {}
 
         throw new Error(
-            `فشل تحليل الصورة (${status})
-
-${detail}`
+            message
         );
     }
 
-    if (!data) {
-        throw new Error(
-            "الخادم أرسل استجابة غير صالحة."
-        );
-    }
+
+    const data =
+        await response.json();
+
 
     if (!data.success) {
 
-        const detail =
+        throw new Error(
             data.details ||
             data.error ||
-            "فشل تحليل الصورة.";
-
-        throw new Error(detail);
+            "فشل تحليل الصورة."
+        );
     }
+
 
     return data.data || {};
 }
