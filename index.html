@@ -3838,7 +3838,7 @@ function renderFilteredParcel(parcel, index) {
             </div>
             <div class="parcel-info">👤 ${escapeHTML(parcel.name || 'بدون اسم')}</div>
             <div class="address-box">📍 ${escapeHTML(address)}</div>
-            ${parcel.routeOrder ? `<div class="route-mini">🔢 ترتيب المسار: ${parcel.routeOrder} · 📏 ${Number(parcel.routeDistanceKm || 0).toFixed(2)} كم</div>` : ''}
+            ${parcel.routeOrder && Number.isFinite(Number(parcel.routeDistanceKm)) ? `<div class="route-mini">🔢 ترتيب المسار: ${parcel.routeOrder} · 📏 ${formatRouteDistance(Number(parcel.routeDistanceKm))}</div>` : ''}
             ${parcel.deliveredAt ? `<div class="parcel-fields">🕐 تم التسليم: ${new Date(parcel.deliveredAt).toLocaleString('de-DE')}</div>` : ''}
             ${parcel.notes ? `<div class="parcel-fields">📝 ${escapeHTML(parcel.notes)}</div>` : ''}
             <div class="btn-group">
@@ -3975,62 +3975,277 @@ function saveSignature() {
 /* Preserve the original list: these additions only add filtered views. */
 const originalSaveParcelForm = window.saveParcelForm;
 
+function isPlausibleGermanyCoordinate(lat, lon) {
+    const a = Number(lat);
+    const b = Number(lon);
+
+    if (
+        !Number.isFinite(a) ||
+        !Number.isFinite(b) ||
+        Math.abs(a) > 90 ||
+        Math.abs(b) > 180
+    ) {
+        return false;
+    }
+
+    // Germany / Göttingen delivery area sanity bounds.
+    // This also catches accidentally swapped lat/lon values
+    // such as lat=9.93, lon=51.53.
+    return (
+        a >= 47.0 &&
+        a <= 55.3 &&
+        b >= 5.5 &&
+        b <= 15.8
+    );
+}
+
 async function geocodeForRoute(parcel) {
-    if (Number.isFinite(Number(parcel.lat)) && Number.isFinite(Number(parcel.lon))) return true;
+    if (!parcel) return false;
+
     const address = getAddress(parcel);
-    if (!address || address === 'عنوان غير مكتمل') return false;
+
+    if (
+        !address ||
+        address === "عنوان غير مكتمل"
+    ) {
+        return false;
+    }
+
     try {
-        const r = await fetch(GEOCODE_BACKEND_URL + '?q=' + encodeURIComponent(address));
+        // IMPORTANT:
+        // Always re-geocode from the actual address for route planning.
+        // This fixes stale/reversed coordinates saved by older versions.
+        const r = await fetch(
+            GEOCODE_BACKEND_URL +
+            "?q=" +
+            encodeURIComponent(address)
+        );
+
         const d = await r.json();
-        if (!d.success || !Number.isFinite(Number(d.lat)) || !Number.isFinite(Number(d.lon))) return false;
-        parcel.lat=Number(d.lat); parcel.lon=Number(d.lon);
+
+        const lat = Number(d?.lat);
+        const lon = Number(d?.lon);
+
+        if (
+            !d?.success ||
+            !isPlausibleGermanyCoordinate(lat, lon)
+        ) {
+            return false;
+        }
+
+        parcel.lat = lat;
+        parcel.lon = lon;
+
+        // Mark that these coordinates were freshly verified.
+        parcel.coordinatesVerified = true;
+
         return true;
-    } catch(e) { return false; }
+    } catch (e) {
+        console.error("Geocode route error:", e);
+        return false;
+    }
 }
 
 async function optimizeRouteSafe() {
-    const candidates=parcels.filter(p=>p.status==='pending'||p.status==='reattempt');
-    if(!candidates.length) return alert('لا توجد طرود متبقية.');
-    if(lastLat===null||lastLon===null) return alert('اسمح للتطبيق بالوصول إلى موقعك أولًا.');
+    const candidates = parcels.filter(
+        p =>
+            p &&
+            (
+                p.status === "pending" ||
+                p.status === "reattempt"
+            )
+    );
+
+    if (!candidates.length) {
+        alert("لا توجد طرود متبقية.");
+        return;
+    }
+
+    const startLat = Number(lastLat);
+    const startLon = Number(lastLon);
+
+    if (
+        !Number.isFinite(startLat) ||
+        !Number.isFinite(startLon) ||
+        Math.abs(startLat) > 90 ||
+        Math.abs(startLon) > 180
+    ) {
+        alert("اسمح للتطبيق بالوصول إلى موقعك أولاً.");
+        return;
+    }
+
     showLoading(true);
+
     try {
-        for(let i=0;i<candidates.length;i++){
-            await geocodeForRoute(candidates[i]);
-            const loadingEl = document.getElementById("loading");
+        const located = [];
+
+        for (let i = 0; i < candidates.length; i++) {
+            const parcel = candidates[i];
+
+            // Delete old route values so stale distances never remain visible.
+            parcel.routeOrder = null;
+            parcel.routeDistanceKm = null;
+
+            const ok = await geocodeForRoute(parcel);
+
+            const loadingEl =
+                document.getElementById("loading");
+
             if (loadingEl) {
                 loadingEl.textContent =
                     `📍 تحديد مواقع الطرود ${i + 1}/${candidates.length}`;
             }
-            if(i<candidates.length-1) await new Promise(r=>setTimeout(r,1100));
-        }
-        const remaining=candidates.filter(p=>Number.isFinite(Number(p.lat))&&Number.isFinite(Number(p.lon)));
-        if(!remaining.length) throw new Error('لم يتم العثور على إحداثيات للطرود.');
-        const ordered=[]; let lat=Number(lastLat), lon=Number(lastLon);
-        while(remaining.length){
-            let bi=0, bd=Infinity;
-            remaining.forEach((p,i)=>{const d=calculateDistance(lat,lon,p.lat,p.lon);if(d<bd){bd=d;bi=i;}});
-            const p=remaining.splice(bi,1)[0];
-            p.routeOrder=ordered.length+1; p.routeDistanceKm=Number(bd.toFixed(2));
-            ordered.push(p); lat=p.lat; lon=p.lon;
-        }
-        saveAndSync();
-        showParcelView('route');
-        const n = ordered[0];
-        const next = document.getElementById("nextStop");
 
-        if (next && n) {
+            if (ok) {
+                const coords = {
+                    lat: Number(parcel.lat),
+                    lon: Number(parcel.lon)
+                };
+
+                // Final coordinate sanity check.
+                if (
+                    isPlausibleGermanyCoordinate(
+                        coords.lat,
+                        coords.lon
+                    )
+                ) {
+                    located.push(parcel);
+                }
+            }
+
+            // Respect Nominatim request pacing.
+            if (i < candidates.length - 1) {
+                await new Promise(
+                    resolve => setTimeout(resolve, 1100)
+                );
+            }
+        }
+
+        if (!located.length) {
+            throw new Error(
+                "لم يتم العثور على إحداثيات صالحة للطرود."
+            );
+        }
+
+        const remaining = [...located];
+
+        const ordered = [];
+
+        let currentLat = startLat;
+        let currentLon = startLon;
+
+        while (remaining.length) {
+            let bestIndex = -1;
+            let bestDistance = Infinity;
+
+            for (
+                let i = 0;
+                i < remaining.length;
+                i++
+            ) {
+                const parcel = remaining[i];
+
+                const distance =
+                    calculateDistance(
+                        currentLat,
+                        currentLon,
+                        Number(parcel.lat),
+                        Number(parcel.lon)
+                    );
+
+                if (
+                    Number.isFinite(distance) &&
+                    distance < bestDistance
+                ) {
+                    bestDistance = distance;
+                    bestIndex = i;
+                }
+            }
+
+            if (bestIndex === -1) {
+                break;
+            }
+
+            const nextParcel =
+                remaining.splice(
+                    bestIndex,
+                    1
+                )[0];
+
+            nextParcel.routeOrder =
+                ordered.length + 1;
+
+            nextParcel.routeDistanceKm =
+                Number(
+                    bestDistance.toFixed(3)
+                );
+
+            ordered.push(nextParcel);
+
+            currentLat =
+                Number(nextParcel.lat);
+
+            currentLon =
+                Number(nextParcel.lon);
+        }
+
+        // Any parcel that could not be routed gets no fake distance.
+        candidates.forEach(parcel => {
+            if (!ordered.includes(parcel)) {
+                parcel.routeOrder = null;
+                parcel.routeDistanceKm = null;
+            }
+        });
+
+        saveAndSync();
+
+        showParcelView("route");
+
+        const first = ordered[0];
+        const next =
+            document.getElementById(
+                "nextStop"
+            );
+
+        if (next && first) {
             next.style.display = "block";
+
             next.innerHTML =
                 `<b>🚚 الطرد التالي</b><br>` +
-                `📍 ${escapeHTML(getAddress(n))}<br>` +
-                `📏 ${formatRouteDistance(n.routeDistanceKm)}<br>` +
-                `<button class="action-btn map-btn" ` +
-                `style="width:100%;margin-top:5px" ` +
-                `onclick="openParcelNavigation(${parcels.indexOf(n)})">` +
-                `🧭 الملاحة</button>`;
+                `📍 ${escapeHTML(
+                    getAddress(first)
+                )}<br>` +
+                `📏 ${formatRouteDistance(
+                    first.routeDistanceKm
+                )}<br>` +
+                `<button
+                    class="action-btn map-btn"
+                    style="width:100%;margin-top:5px"
+                    onclick="openParcelNavigation(${parcels.indexOf(first)})"
+                >
+                    🧭 الملاحة
+                </button>`;
         }
-    } catch(e){ alert(e.message||'تعذر ترتيب المسار.'); }
-    finally { setTimeout(()=>showLoading(false),700); }
+
+    } catch (e) {
+
+        console.error(
+            "Route optimization error:",
+            e
+        );
+
+        alert(
+            e?.message ||
+            "تعذر ترتيب المسار."
+        );
+
+    } finally {
+
+        setTimeout(
+            () => showLoading(false),
+            700
+        );
+    }
 }
 
 // Initialize views after the original UI has rendered. The original list remains the source of truth.
