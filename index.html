@@ -410,35 +410,6 @@
         .route-mini { background:#172554; border:1px solid #2563eb; padding:6px; border-radius:6px; margin:5px 0; }
         .filter-card { background:#334155; border:1px solid #475569; padding:8px; border-radius:7px; margin-bottom:7px; }
     </style>
-
-<style id="batch-camera-style">
-#batchCameraModal{
-  position:fixed;inset:0;background:rgba(0,0,0,.92);z-index:99999;
-  display:none;align-items:center;justify-content:center;padding:14px;
-}
-#batchCameraModal.show{display:flex}
-.batch-camera-box{
-  width:min(520px,100%);max-height:96vh;overflow:auto;background:#0f172a;
-  border:1px solid #334155;border-radius:18px;padding:14px;color:#fff;
-}
-#batchCameraVideo{
-  width:100%;display:block;background:#000;border-radius:14px;
-  aspect-ratio:3/4;object-fit:cover;
-}
-.batch-camera-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}
-.batch-camera-actions button{
-  border:0;border-radius:12px;padding:13px;font-weight:800;font-size:14px;cursor:pointer;
-}
-#batchCaptureBtn{background:#10b981;color:#fff}
-#batchFinishBtn{background:#0ea5e9;color:#fff}
-#batchCameraCloseBtn{background:#334155;color:#fff}
-#batchGalleryBtn{background:#7c3aed;color:#fff}
-#batchPhotoCount{text-align:center;color:#cbd5e1;margin:8px 0;font-size:13px}
-#batchThumbs{display:flex;gap:6px;overflow-x:auto;padding:4px 0}
-#batchThumbs img{width:58px;height:76px;object-fit:cover;border-radius:7px;border:1px solid #475569;flex:none}
-#batchCameraStatus{text-align:center;color:#93c5fd;min-height:20px;margin-top:7px;font-size:12px}
-</style>
-
 </head>
 
 
@@ -531,22 +502,6 @@
             capture="environment"
             hidden
         >
-        <button
-            id="batchImportBtn"
-            class="action-main-btn"
-            style="background:#0f766e;"
-        >
-            📦➕ إضافة كل الطرود دفعة واحدة
-        </button>
-
-        <input
-            id="batchImportInput"
-            type="file"
-            accept="image/*"
-            multiple
-            hidden
-        >
-
 
 
         <!-- OCR محلي احتياطي -->
@@ -1172,567 +1127,6 @@ async function analyzeAddressWithAI(
 
     return data.data || {};
 }
-
-
-
-
-/* =====================================================
-   BATCH PARCEL IMPORT
-   Add one or many parcel images in one operation.
-   Each image may contain one parcel or several labels.
-===================================================== */
-
-function normalizeBatchParcel(item) {
-    if (!item || typeof item !== "object") return null;
-
-    const address =
-        item.address ||
-        item.fullAddress ||
-        [item.street || "", item.houseNumber || item.house || "", item.postalCode || item.zip || "", item.city || ""]
-            .filter(Boolean).join(" ").trim();
-
-    const parcel = {
-        id: Date.now() + Math.floor(Math.random() * 1000000),
-        name: String(item.name || item.recipientName || "").trim(),
-        street: String(item.street || "").trim(),
-        house: String(item.houseNumber || item.house || "").trim(),
-        zip: String(item.postalCode || item.zip || "").trim(),
-        city: String(item.city || "").trim(),
-        phone: String(item.phone || "").trim(),
-        barcode: String(item.trackingNumber || item.barcode || "").trim(),
-        notes: String(item.notes || "").trim(),
-        status: "pending",
-        proofUrl: null,
-        signatureUrl: null,
-        deliveredAt: null,
-        signatureAt: null,
-        lat: null,
-        lon: null,
-        routeOrder: null,
-        routeDistanceKm: null,
-        createdAt: new Date().toISOString()
-    };
-
-    // If Gemini returned only a combined address, preserve it in notes so it
-    // is not lost; the normal getAddress() function can still use the fields.
-    if (!parcel.street && address) parcel.notes = parcel.notes || address;
-
-    if (!parcel.street && !parcel.city && !parcel.name && !address) return null;
-    return parcel;
-}
-
-async function analyzeBatchImage(file) {
-    const image = await fileToDataURL(file);
-
-    const response = await fetch(
-        AI_BACKEND_URL + "/analyze-image",
-        {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-                image,
-                mimeType: file.type || "image/jpeg",
-                prompt: `
-حلل صورة تحتوي على ملصق واحد أو عدة ملصقات طرود.
-استخرج جميع الطرود الظاهرة في الصورة، وليس أول طرد فقط.
-أعد JSON فقط بهذا الشكل:
-{
-  "packages": [
-    {
-      "name": "",
-      "address": "",
-      "street": "",
-      "houseNumber": "",
-      "postalCode": "",
-      "city": "",
-      "phone": "",
-      "trackingNumber": "",
-      "notes": ""
-    }
-  ]
-}
-إذا كانت الصورة تحتوي على طرد واحد، يجب أن يكون packages مصفوفة تحتوي على طرد واحد.
-لا تخمن البيانات. إذا لم تكن قيمة واضحة اتركها فارغة.
-                `.trim()
-            })
-        }
-    );
-
-    let data = {};
-    const rawText = await response.text();
-
-    try {
-        data = rawText ? JSON.parse(rawText) : {};
-    } catch (e) {
-        throw new Error("استجابة الـAI ليست JSON صحيحة.");
-    }
-
-    if (!response.ok || !data.success) {
-        throw new Error(
-            data.error ||
-            data.message ||
-            `فشل تحليل الصورة (HTTP ${response.status})`
-        );
-    }
-
-    /*
-      The Worker can return the AI result in several valid shapes.
-      Accept all of them so batch import does not silently become 0/0.
-    */
-    let packages = [];
-
-    const candidates = [
-        data?.data?.packages,
-        data?.data?.parcels,
-        data?.packages,
-        data?.parcels,
-        data?.result?.packages,
-        data?.result?.parcels
-    ];
-
-    for (const candidate of candidates) {
-        if (Array.isArray(candidate)) {
-            packages = candidate;
-            break;
-        }
-    }
-
-    // data.data itself may already be an array.
-    if (!packages.length && Array.isArray(data?.data)) {
-        packages = data.data;
-    }
-
-    // The AI may return one parcel object instead of packages[].
-    if (
-        !packages.length &&
-        data?.data &&
-        typeof data.data === "object" &&
-        !Array.isArray(data.data)
-    ) {
-        const one = data.data;
-
-        if (
-            one.address ||
-            one.fullAddress ||
-            one.street ||
-            one.houseNumber ||
-            one.postalCode ||
-            one.city ||
-            one.recipientName ||
-            one.name ||
-            one.trackingNumber ||
-            one.barcode
-        ) {
-            packages = [one];
-        }
-    }
-
-    // Some Worker versions return the AI JSON as text.
-    const textCandidates = [
-        data?.text,
-        data?.data?.text,
-        data?.rawText
-    ].filter(v => typeof v === "string" && v.trim());
-
-    if (!packages.length && textCandidates.length) {
-        for (const text of textCandidates) {
-            try {
-                const clean = text
-                    .replace(/```json/gi, "")
-                    .replace(/```/g, "")
-                    .trim();
-
-                let parsed = null;
-
-                try {
-                    parsed = JSON.parse(clean);
-                } catch {
-                    const a = clean.indexOf("{");
-                    const b = clean.lastIndexOf("}");
-                    if (a >= 0 && b > a) {
-                        parsed = JSON.parse(clean.slice(a, b + 1));
-                    }
-                }
-
-                if (Array.isArray(parsed)) {
-                    packages = parsed;
-                    break;
-                }
-
-                if (parsed?.packages && Array.isArray(parsed.packages)) {
-                    packages = parsed.packages;
-                    break;
-                }
-
-                if (parsed?.parcels && Array.isArray(parsed.parcels)) {
-                    packages = parsed.parcels;
-                    break;
-                }
-
-                if (
-                    parsed &&
-                    typeof parsed === "object" &&
-                    (
-                        parsed.address ||
-                        parsed.street ||
-                        parsed.city ||
-                        parsed.name ||
-                        parsed.recipientName
-                    )
-                ) {
-                    packages = [parsed];
-                    break;
-                }
-            } catch {
-                // Try the next possible text field.
-            }
-        }
-    }
-
-    /*
-      Never silently return 0 when the Worker actually returned a
-      successful AI response. Throw a useful error instead so the user
-      knows exactly which image failed.
-    */
-    if (!packages.length) {
-        console.error("Batch AI returned no parcels:", data);
-
-        throw new Error(
-            "الـAI أنهى تحليل الصورة لكنه لم يرجع أي طرود. " +
-            "تحقق من استجابة Worker /analyze-image."
-        );
-    }
-
-    return packages;
-}
-
-function parcelDedupKey(p) {
-    const tracking = String(p.barcode || "").replace(/\s+/g, "").toLowerCase();
-    if (tracking) return "tracking:" + tracking;
-    return [p.street, p.house, p.zip, p.city, p.name]
-        .map(v => String(v || "").trim().toLowerCase())
-        .join("|");
-}
-
-async function importAllParcelsBatch(files) {
-    if (!files || !files.length) return;
-
-    const batchBtn = document.getElementById("batchImportBtn");
-    if (batchBtn) batchBtn.disabled = true;
-    showLoading(true);
-
-    const detected = [];
-
-    try {
-        for (let i = 0; i < files.length; i++) {
-            const file = files[i];
-            document.getElementById("loading").textContent =
-                `🤖 قراءة الطرود ${i + 1}/${files.length}...`;
-
-            const items = await analyzeBatchImage(file);
-            detected.push(...items);
-        }
-
-        const existingKeys = new Set(parcels.map(parcelDedupKey));
-        const added = [];
-        const seen = new Set();
-        let invalid = 0;
-        let duplicates = 0;
-
-        for (const item of detected) {
-            const p = normalizeBatchParcel(item);
-
-            if (!p) {
-                invalid++;
-                continue;
-            }
-
-            const key = parcelDedupKey(p);
-
-            if (!key || seen.has(key) || existingKeys.has(key)) {
-                duplicates++;
-                continue;
-            }
-
-            seen.add(key);
-            added.push(p);
-        }
-
-        if (added.length) {
-            parcels.push(...added);
-            saveAndSync();
-        }
-
-        // Show the normal parcel list immediately.
-        showParcelView("all");
-
-        alert(
-            `تمت إضافة ${added.length} طرد من أصل ${detected.length} طرد مقروء.` +
-            `\nالمكرر: ${duplicates}` +
-            `\nالبيانات غير الكافية: ${invalid}`
-        );
-
-    } catch (error) {
-        console.error(error);
-        alert("تعذر إضافة الطرود دفعة واحدة:\n\n" + (error.message || error));
-    } finally {
-        showLoading(false);
-        if (batchBtn) batchBtn.disabled = false;
-    }
-}
-
-
-let batchCameraStream = null;
-let batchCapturedFiles = [];
-
-function updateBatchCameraUI() {
-    const count = document.getElementById("batchPhotoCount");
-    const thumbs = document.getElementById("batchThumbs");
-    if (count) count.textContent = `تم التقاط ${batchCapturedFiles.length} صورة`;
-
-    if (thumbs) {
-        thumbs.innerHTML = "";
-        batchCapturedFiles.forEach(file => {
-            const img = document.createElement("img");
-            img.src = URL.createObjectURL(file);
-            thumbs.appendChild(img);
-        });
-    }
-}
-
-function stopBatchCamera() {
-    if (batchCameraStream) {
-        batchCameraStream.getTracks().forEach(track => track.stop());
-        batchCameraStream = null;
-    }
-    const video = document.getElementById("batchCameraVideo");
-    if (video) video.srcObject = null;
-}
-
-async function openBatchCamera() {
-    const modal = document.getElementById("batchCameraModal");
-    const video = document.getElementById("batchCameraVideo");
-    const status = document.getElementById("batchCameraStatus");
-
-    if (!modal || !video) return;
-
-    batchCapturedFiles = [];
-    updateBatchCameraUI();
-    modal.classList.add("show");
-    modal.setAttribute("aria-hidden", "false");
-
-    try {
-        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-            throw new Error("الكاميرا المباشرة غير مدعومة في هذا المتصفح.");
-        }
-
-        batchCameraStream = await navigator.mediaDevices.getUserMedia({
-            video: {
-                facingMode: { ideal: "environment" },
-                width: { ideal: 1920 },
-                height: { ideal: 1080 }
-            },
-            audio: false
-        });
-
-        video.srcObject = batchCameraStream;
-        await video.play();
-
-        if (status) {
-            status.textContent = "الكاميرا جاهزة — صوّر كل طرد ثم اضغط إنهاء وتحليل.";
-        }
-
-    } catch (error) {
-        console.error(error);
-
-        if (status) {
-            status.textContent =
-                "تعذر فتح الكاميرا مباشرة. يمكنك اختيار الصور من الجهاز.";
-        }
-    }
-}
-
-function closeBatchCamera() {
-    stopBatchCamera();
-
-    const modal = document.getElementById("batchCameraModal");
-    if (modal) {
-        modal.classList.remove("show");
-        modal.setAttribute("aria-hidden", "true");
-    }
-}
-
-async function captureBatchParcelPhoto() {
-    const video = document.getElementById("batchCameraVideo");
-    const status = document.getElementById("batchCameraStatus");
-
-    if (!video || !video.videoWidth || !video.videoHeight) {
-        alert("الكاميرا لم تصبح جاهزة بعد.");
-        return;
-    }
-
-    const canvas = document.createElement("canvas");
-
-    // Keep the image large enough for address recognition but avoid enormous uploads.
-    const maxWidth = 1600;
-    const scale = Math.min(1, maxWidth / video.videoWidth);
-
-    canvas.width = Math.round(video.videoWidth * scale);
-    canvas.height = Math.round(video.videoHeight * scale);
-
-    const ctx = canvas.getContext("2d", { alpha: false });
-
-    ctx.drawImage(
-        video,
-        0,
-        0,
-        canvas.width,
-        canvas.height
-    );
-
-    const blob = await new Promise(resolve =>
-        canvas.toBlob(resolve, "image/jpeg", 0.88)
-    );
-
-    if (!blob) {
-        alert("تعذر حفظ الصورة.");
-        return;
-    }
-
-    const file = new File(
-        [blob],
-        `parcel-${Date.now()}-${batchCapturedFiles.length + 1}.jpg`,
-        { type: "image/jpeg" }
-    );
-
-    batchCapturedFiles.push(file);
-    updateBatchCameraUI();
-
-    if (status) {
-        status.textContent =
-            `تم تصوير الطرد ${batchCapturedFiles.length}. يمكنك تصوير الطرد التالي.`;
-    }
-}
-
-async function finishBatchCamera() {
-    if (!batchCapturedFiles.length) {
-        alert("لم يتم تصوير أي طرد.");
-        return;
-    }
-
-    const files = [...batchCapturedFiles];
-
-    closeBatchCamera();
-
-    await importAllParcelsBatch(files);
-}
-
-function initBatchImport() {
-    const button = document.getElementById("batchImportBtn");
-    const galleryInput = document.getElementById("batchGalleryInput");
-
-    if (!button) return;
-
-    // Main button opens the continuous camera.
-    if (!button.dataset.batchBound) {
-        button.addEventListener("click", openBatchCamera);
-        button.dataset.batchBound = "1";
-    }
-
-    const captureBtn =
-        document.getElementById("batchCaptureBtn");
-
-    const finishBtn =
-        document.getElementById("batchFinishBtn");
-
-    const closeBtn =
-        document.getElementById("batchCameraCloseBtn");
-
-    const galleryBtn =
-        document.getElementById("batchGalleryBtn");
-
-    if (captureBtn && !captureBtn.dataset.batchBound) {
-        captureBtn.addEventListener(
-            "click",
-            captureBatchParcelPhoto
-        );
-        captureBtn.dataset.batchBound = "1";
-    }
-
-    if (finishBtn && !finishBtn.dataset.batchBound) {
-        finishBtn.addEventListener(
-            "click",
-            finishBatchCamera
-        );
-        finishBtn.dataset.batchBound = "1";
-    }
-
-    if (closeBtn && !closeBtn.dataset.batchBound) {
-        closeBtn.addEventListener(
-            "click",
-            closeBatchCamera
-        );
-        closeBtn.dataset.batchBound = "1";
-    }
-
-    if (galleryBtn && galleryInput && !galleryBtn.dataset.batchBound) {
-        galleryBtn.addEventListener(
-            "click",
-            () => galleryInput.click()
-        );
-        galleryBtn.dataset.batchBound = "1";
-
-        galleryInput.addEventListener(
-            "change",
-            async event => {
-                const files =
-                    Array.from(
-                        event.target.files || []
-                    );
-
-                event.target.value = "";
-
-                if (!files.length) return;
-
-                closeBatchCamera();
-                await importAllParcelsBatch(files);
-            }
-        );
-    }
-
-    // Keep the old hidden batch input as a fallback if it exists.
-    const oldInput =
-        document.getElementById("batchImportInput");
-
-    if (oldInput) {
-        oldInput.addEventListener(
-            "change",
-            async event => {
-                const files =
-                    Array.from(
-                        event.target.files || []
-                    );
-
-                event.target.value = "";
-
-                if (files.length) {
-                    await importAllParcelsBatch(files);
-                }
-            }
-        );
-    }
-}
-
-document.addEventListener("DOMContentLoaded", function () {
-    initBatchImport();
-});
-window.addEventListener("load", function () {
-    // Rebind only if the modal exists and the main button has not been bound.
-    const btn = document.getElementById("batchImportBtn");
-    if (btn && !btn.dataset.batchBound) {
-        initBatchImport();
-    }
-});
 
 
 /* =====================================================
@@ -2724,7 +2118,7 @@ function updateUI() {
         );
 
 
-    const emptyMsg =
+    let emptyMsg =
         document.getElementById(
             "emptyMsg"
         );
@@ -2791,25 +2185,19 @@ function updateUI() {
         " كم";
 
 
-    listEl.innerHTML =
-        "";
-
+    // Clearing the list removes #emptyMsg from the DOM.
+    // Recreate it when needed instead of keeping a stale/null reference.
+    listEl.innerHTML = "";
 
     if (!total) {
-
-        listEl.appendChild(
-            emptyMsg
-        );
-
-        emptyMsg.style.display =
-            "block";
-
+        emptyMsg = document.createElement("p");
+        emptyMsg.id = "emptyMsg";
+        emptyMsg.className = "empty";
+        emptyMsg.textContent = "ما في طرود مضافة. ابدأ الإدخال!";
+        emptyMsg.style.display = "block";
+        listEl.appendChild(emptyMsg);
         return;
     }
-
-
-    emptyMsg.style.display =
-        "none";
 
 
     parcels.forEach(
@@ -3000,8 +2388,6 @@ function updateUI() {
                             ? `
                                 <button
                                     class="action-btn deliver-btn"
-                                    data-parcel-action="deliver"
-                                    data-parcel-index="${index}"
                                     onclick="markDelivered(${index})"
                                 >
                                     ✅ تسليم
@@ -3017,8 +2403,6 @@ function updateUI() {
                             ? `
                                 <button
                                     class="action-btn absent-btn"
-                                    data-parcel-action="absent"
-                                    data-parcel-index="${index}"
                                     onclick="markAbsent(${index})"
                                 >
                                     🏠 غياب
@@ -3030,8 +2414,6 @@ function updateUI() {
 
                     <button
                         class="action-btn proof-btn"
-                        data-parcel-action="proof"
-                        data-parcel-index="${index}"
                         onclick="takeProof(${index})"
                     >
                         📸 صورة
@@ -3078,26 +2460,16 @@ function markDelivered(
     index
 ) {
 
-    const parcel = parcels[index];
-    if (!parcel) return;
+    parcels[index].status =
+        "delivered";
 
-    parcel.status = "delivered";
-    parcel.deliveredAt = new Date().toISOString();
 
-    // Save the current GPS position when available.
-    if (Number.isFinite(Number(lastLat)) && Number.isFinite(Number(lastLon))) {
-        parcel.deliveryLat = Number(lastLat);
-        parcel.deliveryLon = Number(lastLon);
-    }
+    parcels[index].deliveredAt =
+        new Date()
+            .toISOString();
+
 
     saveAndSync();
-
-    // Keep the user on the same page and show a clear confirmation.
-    setTimeout(() => {
-        try {
-            alert("تم تأكيد تسليم الطرد وحفظه في History.");
-        } catch (_) {}
-    }, 0);
 }
 
 
@@ -3668,13 +3040,13 @@ function renderFilteredParcel(parcel, index) {
             ${parcel.deliveredAt ? `<div class="parcel-fields">🕐 تم التسليم: ${new Date(parcel.deliveredAt).toLocaleString('de-DE')}</div>` : ''}
             ${parcel.notes ? `<div class="parcel-fields">📝 ${escapeHTML(parcel.notes)}</div>` : ''}
             <div class="btn-group">
-                <button class="action-btn map-btn" data-parcel-action="navigation" data-parcel-index="${index}" onclick="openParcelNavigation(${index})">🧭 ملاحة</button>
+                <button class="action-btn map-btn" onclick="openParcelNavigation(${index})">🧭 ملاحة</button>
                 ${phone ? `<a class="action-btn wa-btn" target="_blank" href="https://wa.me/${wa}">💬 WhatsApp</a>` : ''}
                 ${phone ? `<a class="action-btn" style="background:#2563eb" href="tel:${escapeHTML(phone)}">📞 اتصال</a>` : ''}
-                ${parcel.status !== 'delivered' ? `<button class="action-btn deliver-btn" data-parcel-action="deliver" data-parcel-index="${index}" onclick="markDelivered(${index})">✅ تسليم</button>` : ''}
-                <button class="action-btn proof-btn" data-parcel-action="proof" data-parcel-index="${index}" onclick="takeProof(${index})">📸 صورة</button>
-                <button class="action-btn" style="background:#9333ea" data-parcel-action="signature" data-parcel-index="${index}" onclick="openSignature(${index})">✍️ توقيع</button>
-                <button class="action-btn edit-btn" data-parcel-action="edit" data-parcel-index="${index}" onclick="editParcel(${index})">✏️ تعديل</button>
+                ${parcel.status !== 'delivered' ? `<button class="action-btn deliver-btn" onclick="markDelivered(${index})">✅ تسليم</button>` : ''}
+                <button class="action-btn proof-btn" onclick="takeProof(${index})">📸 صورة</button>
+                <button class="action-btn" style="background:#9333ea" onclick="openSignature(${index})">✍️ توقيع</button>
+                <button class="action-btn edit-btn" onclick="editParcel(${index})">✏️ تعديل</button>
             </div>
             ${parcel.proofUrl ? `<div style="margin-top:6px"><b>📸 صورة التسليم</b><img class="proof-img" src="${escapeHTML(parcel.proofUrl)}"></div>` : ''}
             ${parcel.signatureUrl ? `<div style="margin-top:6px"><b>✍️ توقيع المستلم</b><img class="proof-img" src="${escapeHTML(parcel.signatureUrl)}"></div>` : ''}
@@ -3815,6 +3187,12 @@ async function geocodeForRoute(parcel) {
 }
 
 async function optimizeRouteSafe() {
+    // Make sure the main parcel list is rendered before route optimization
+    // triggers saveAndSync()/updateUI().
+    if (!document.getElementById("parcelsList")) {
+        showParcelView("all");
+    }
+
     const candidates=parcels.filter(p=>p.status==='pending'||p.status==='reattempt');
     if(!candidates.length) return alert('لا توجد طرود متبقية.');
     if(lastLat===null||lastLon===null) return alert('اسمح للتطبيق بالوصول إلى موقعك أولًا.');
@@ -3851,74 +3229,7 @@ setTimeout(() => {
     showParcelView('all');
 }, 0);
 
-
-/* =====================================================
-   ROBUST PARCEL ACTION HANDLERS
-   Works for dynamically rendered parcel cards too.
-===================================================== */
-
-window.markDelivered = markDelivered;
-window.markAbsent = markAbsent;
-window.takeProof = takeProof;
-window.openSignature = openSignature;
-window.editParcel = editParcel;
-window.openParcelNavigation = openParcelNavigation;
-window.sendDeliveryConfirmation = sendDeliveryConfirmation;
-window.showParcelView = showParcelView;
-
-if (!window.__parcelActionHandlerInstalled) {
-    window.__parcelActionHandlerInstalled = true;
-
-    document.addEventListener('click', function (event) {
-        const button = event.target.closest('[data-parcel-action]');
-        if (!button) return;
-
-        const action = button.dataset.parcelAction;
-        const index = Number(button.dataset.parcelIndex);
-
-        if (!Number.isInteger(index) || !parcels[index]) return;
-
-        event.preventDefault();
-        event.stopPropagation();
-
-        try {
-            if (action === 'deliver') markDelivered(index);
-            else if (action === 'proof') takeProof(index);
-            else if (action === 'signature') openSignature(index);
-            else if (action === 'edit') editParcel(index);
-            else if (action === 'absent') markAbsent(index);
-            else if (action === 'navigation') openParcelNavigation(index);
-            else if (action === 'whatsapp') sendDeliveryConfirmation(index);
-        } catch (error) {
-            console.error('Parcel action error:', error);
-            alert('تعذر تنفيذ العملية. حاول مرة أخرى.');
-        }
-    });
-}
-
 </script>
-
-
-<!-- Batch AI Camera -->
-<div id="batchCameraModal" aria-hidden="true">
-  <div class="batch-camera-box">
-    <h3 style="margin:4px 0 8px;text-align:center">📦📷 تصوير كل الطرود</h3>
-    <div style="text-align:center;color:#cbd5e1;font-size:12px">
-      صوّر الطرود واحدًا بعد الآخر بدون الرجوع للواجهة. عند الانتهاء اضغط «إنهاء وتحليل».
-    </div>
-    <video id="batchCameraVideo" autoplay playsinline muted></video>
-    <div id="batchPhotoCount">تم التقاط 0 صورة</div>
-    <div id="batchThumbs"></div>
-    <div id="batchCameraStatus"></div>
-    <div class="batch-camera-actions">
-      <button id="batchCaptureBtn">📸 تصوير الطرد</button>
-      <button id="batchFinishBtn">🤖 إنهاء وتحليل الكل</button>
-      <button id="batchGalleryBtn">🖼️ اختيار صور من الجهاز</button>
-      <button id="batchCameraCloseBtn">✕ إغلاق</button>
-    </div>
-    <input id="batchGalleryInput" type="file" accept="image/*" multiple hidden>
-  </div>
-</div>
 
 </body>
 </html>
