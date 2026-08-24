@@ -3459,6 +3459,15 @@ function takeProof(
 
 
                     saveAndSync();
+                    updateUI();
+
+                    setTimeout(() => {
+                        try {
+                            showParcelView("history");
+                        } catch (e) {
+                            console.error("History view:", e);
+                        }
+                    }, 0);
                 };
 
 
@@ -3838,7 +3847,12 @@ function renderFilteredParcel(parcel, index) {
             </div>
             <div class="parcel-info">👤 ${escapeHTML(parcel.name || 'بدون اسم')}</div>
             <div class="address-box">📍 ${escapeHTML(address)}</div>
-            ${parcel.routeOrder && Number.isFinite(Number(parcel.routeDistanceKm)) ? `<div class="route-mini">🔢 ترتيب المسار: ${parcel.routeOrder} · 📏 ${formatRouteDistance(Number(parcel.routeDistanceKm))}</div>` : ''}
+            ${parcel.routeOrder && Number.isFinite(Number(parcel.routeDistanceKm)) ? `
+    <div class="route-mini">
+        <b>🔢 محطة ${parcel.routeOrder}</b>
+        · 📏 ${formatRouteDistance(Number(parcel.routeDistanceKm))}
+    </div>
+` : ''}
             ${parcel.deliveredAt ? `<div class="parcel-fields">🕐 تم التسليم: ${new Date(parcel.deliveredAt).toLocaleString('de-DE')}</div>` : ''}
             ${parcel.notes ? `<div class="parcel-fields">📝 ${escapeHTML(parcel.notes)}</div>` : ''}
             <div class="btn-group">
@@ -3857,35 +3871,98 @@ function renderFilteredParcel(parcel, index) {
 }
 
 function showParcelView(view) {
-    const box = document.getElementById('filteredParcelView');
+    const box = document.getElementById("filteredParcelView");
     if (!box) return;
 
-    const original = document.getElementById('parcelsList');
-    const originalCard = original ? original.closest('.card') : null;
+    const original = document.getElementById("parcelsList");
+    const originalCard =
+        original ? original.closest(".card") : null;
 
-    // Keep the original "الطرود بالشنطة" list visible for ALL.
-    if (originalCard) originalCard.style.display = view === 'all' ? 'block' : 'none';
+    if (originalCard) {
+        originalCard.style.display =
+            view === "all" ? "block" : "none";
+    }
 
-    if (view === 'all') {
-        box.style.display = 'none';
+    if (view === "all") {
+        box.style.display = "none";
         return;
     }
 
-    box.style.display = 'block';
+    box.style.display = "block";
 
     let list = [];
-    if (view === 'today') {
+
+    if (view === "today") {
         list = parcels.filter(isParcelToday);
-    } else if (view === 'history') {
-        list = parcels.filter(p => p.status === 'delivered');
+
+    } else if (view === "history") {
+        list = parcels.filter(
+            p => p && p.status === "delivered"
+        );
+
+    } else if (view === "route") {
+        // Active route: delivered parcels are archived in History.
+        list = parcels.filter(
+            p =>
+                p &&
+                p.status !== "delivered" &&
+                p.status !== "absent" &&
+                Number.isFinite(
+                    Number(p.routeOrder)
+                ) &&
+                Number.isFinite(
+                    Number(p.routeDistanceKm)
+                )
+        );
+
+        list.sort(
+            (a, b) =>
+                Number(a.routeOrder) -
+                Number(b.routeOrder)
+        );
+
     } else {
-        list = parcels.filter(p => p.status === 'pending' || p.status === 'reattempt');
-        list.sort((a,b) => Number(a.routeOrder || 999999) - Number(b.routeOrder || 999999));
+        list = parcels.filter(
+            p =>
+                p &&
+                (
+                    p.status === "pending" ||
+                    p.status === "reattempt"
+                )
+        );
     }
 
-    const title = view === 'today' ? '📅 طرود اليوم' : view === 'history' ? '🕘 الطرود المستلمة' : '🚚 مسار التسليم';
-    box.innerHTML = `<div style="font-weight:bold;color:#38bdf8;margin-bottom:6px">${title} <span class="section-count">(${list.length})</span></div>` +
-        (list.length ? list.map(p => renderFilteredParcel(p, parcels.indexOf(p))).join('') : '<div class="empty">لا توجد طرود هنا.</div>');
+    const title =
+        view === "today"
+            ? "📅 طرود اليوم"
+            : view === "history"
+                ? "🕘 الطرود المستلمة"
+                : "🚚 مسار التسليم";
+
+    box.innerHTML =
+        `<div style="font-weight:bold;color:#38bdf8;margin-bottom:8px">
+            ${title}
+            <span class="section-count">
+                (${list.length})
+            </span>
+        </div>` +
+        (
+            list.length
+                ? list
+                    .map(
+                        p =>
+                            renderFilteredParcel(
+                                p,
+                                parcels.indexOf(p)
+                            )
+                    )
+                    .join("")
+                : `
+                    <div class="empty">
+                        لا توجد طرود هنا.
+                    </div>
+                `
+        );
 }
 
 function openParcelNavigation(index) {
@@ -4199,6 +4276,11 @@ async function optimizeRouteSafe() {
 
         saveAndSync();
 
+
+
+        // Render the complete route: stop 1, stop 2, stop 3, ... last stop.
+
+
         showParcelView("route");
 
         const first = ordered[0];
@@ -4260,6 +4342,72 @@ setTimeout(() => {
    ROBUST PARCEL ACTION HANDLERS
    Works for dynamically rendered parcel cards too.
 ===================================================== */
+
+
+async function markDelivered(index) {
+    const parcel = parcels[index];
+
+    if (!parcel) {
+        alert("الطرد غير موجود.");
+        return;
+    }
+
+    // Archive immediately.
+    parcel.status = "delivered";
+    parcel.deliveredAt = new Date().toISOString();
+
+    // Remove stale route position so it disappears from active route.
+    parcel.routeOrder = null;
+    parcel.routeDistanceKm = null;
+
+    // Capture current GPS when available.
+    if (
+        navigator.geolocation &&
+        typeof navigator.geolocation.getCurrentPosition === "function"
+    ) {
+        await new Promise(resolve => {
+            navigator.geolocation.getCurrentPosition(
+                position => {
+                    parcel.deliveredLat =
+                        position.coords.latitude;
+                    parcel.deliveredLon =
+                        position.coords.longitude;
+                    resolve();
+                },
+                () => resolve(),
+                {
+                    enableHighAccuracy: true,
+                    timeout: 8000,
+                    maximumAge: 0
+                }
+            );
+        });
+    }
+
+    // Persist before changing the view.
+    saveAndSync();
+
+    // Refresh the active list: delivered parcel disappears from it.
+    updateUI();
+
+    // Open History automatically, where the delivered parcel remains saved.
+    setTimeout(() => {
+        try {
+            showParcelView("history");
+        } catch (e) {
+            console.error("History view:", e);
+        }
+    }, 0);
+
+    // Send WhatsApp confirmation automatically when a phone exists.
+    if (parcel.phone) {
+        try {
+            sendDeliveryConfirmation(index);
+        } catch (e) {
+            console.error("WhatsApp:", e);
+        }
+    }
+}
 
 window.markDelivered = markDelivered;
 window.markAbsent = markAbsent;
