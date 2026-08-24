@@ -875,6 +875,109 @@
             cursor: zoom-in;
         }
 
+    
+        .history-tools-card {
+            padding: 12px;
+            margin-bottom: 10px;
+        }
+
+        .history-tools-head,
+        .history-search-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .history-tools-head {
+            justify-content: space-between;
+            margin-bottom: 9px;
+        }
+
+        .history-date-btn,
+        .history-day-btn {
+            border: 1px solid rgba(148,163,184,.15);
+            color: #fff;
+            background: #1e293b;
+            border-radius: 11px;
+            padding: 8px 10px;
+            font-weight: 800;
+            cursor: pointer;
+        }
+
+        .history-day-btn.active {
+            background: linear-gradient(135deg,#2563eb,#7c3aed);
+        }
+
+        .history-toolbar {
+            display: flex;
+            gap: 6px;
+            margin-bottom: 9px;
+            overflow-x: auto;
+        }
+
+        .history-search-row {
+            margin-bottom: 8px;
+        }
+
+        .history-search-input {
+            flex: 1;
+            min-width: 0;
+            height: 42px;
+            padding: 0 12px;
+            border-radius: 12px;
+            border: 1px solid #334155;
+            background: #0f172a;
+            color: #fff;
+            outline: none;
+        }
+
+        .history-status-filter {
+            width: 132px;
+            height: 42px;
+            border-radius: 12px;
+            border: 1px solid #334155;
+            background: #0f172a;
+            color: #fff;
+            padding: 0 8px;
+        }
+
+        .history-summary {
+            color: #94a3b8;
+            font-size: 10px;
+            margin-bottom: 8px;
+        }
+
+        @media (max-width: 430px) {
+            .history-search-row {
+                flex-direction: column;
+                align-items: stretch;
+            }
+
+            .history-status-filter {
+                width: 100%;
+            }
+        }
+
+    
+        /* SMART TOUR */
+        .smart-tour-card{padding:12px;margin-bottom:10px;border:1px solid rgba(56,189,248,.16);background:radial-gradient(circle at 100% 0%,rgba(56,189,248,.09),transparent 34%),linear-gradient(145deg,rgba(16,32,53,.96),rgba(10,21,37,.96))}
+        .smart-tour-head{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:10px}
+        .smart-tour-badge{padding:6px 9px;border-radius:999px;font-size:9px;font-weight:900;color:#86efac;background:rgba(52,211,153,.10);border:1px solid rgba(52,211,153,.22)}
+        .smart-tour-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
+        .smart-stat{min-width:0;padding:9px 6px;border-radius:14px;background:rgba(15,23,42,.72);border:1px solid rgba(148,163,184,.10);text-align:center}
+        .smart-stat span{display:block;color:#94a3b8;font-size:9px;margin-bottom:4px}
+        .smart-stat strong{display:block;color:#f8fafc;font-size:16px;line-height:1.15;white-space:nowrap}
+        .smart-stat small{display:block;color:#64748b;font-size:8px;margin-top:2px}
+        .smart-next-card{margin-top:8px;padding:10px;border-radius:14px;background:linear-gradient(135deg,rgba(37,99,235,.18),rgba(124,58,237,.16));border:1px solid rgba(96,165,250,.20)}
+        .smart-next-title{font-size:11px;font-weight:900;color:#bfdbfe;margin-bottom:4px}
+        #smartNextText{color:#e2e8f0;font-size:11px;line-height:1.65}
+        .smart-delay-alert{margin-top:8px;padding:9px;border-radius:12px;background:rgba(239,68,68,.10);border:1px solid rgba(239,68,68,.22);color:#fecaca;font-size:10px;line-height:1.6}
+        .smart-tour-actions{display:grid;grid-template-columns:1.4fr 1fr;gap:7px;margin-top:8px}
+        .smart-tour-actions button{min-height:42px;border:0;border-radius:12px;color:#fff;font-weight:900;cursor:pointer}
+        .smart-action-primary{background:linear-gradient(135deg,#2563eb,#7c3aed)}
+        .smart-action-secondary{background:#334155}
+        @media (max-width:430px){.smart-tour-grid{grid-template-columns:repeat(2,1fr)}}
+
     </style>
 
 <style id="batch-camera-style">
@@ -1138,7 +1241,95 @@
         class="next-stop"
     ></div>
 
-    <div class="card navigation-card" id="parcelNavigation">
+    
+
+<div class="card smart-tour-card" id="smartTourCard">
+    <div class="smart-tour-head">
+        <div>
+            <div class="section-kicker">SMART TOUR</div>
+            <strong>🧠 مساعد الجولة الذكي</strong>
+        </div>
+        <span id="smartTourBadge" class="smart-tour-badge">جاهز</span>
+    </div>
+
+    <div class="smart-tour-grid">
+        <div class="smart-stat"><span>📦 باقي</span><strong id="smartRemaining">0</strong><small>طرد</small></div>
+        <div class="smart-stat"><span>📏 المسار</span><strong id="smartDistance">0.0</strong><small>كم</small></div>
+        <div class="smart-stat"><span>⏱️ متوسط التسليم</span><strong id="smartAvgStop">—</strong><small>دقيقة</small></div>
+        <div class="smart-stat"><span>🏁 النهاية المتوقعة</span><strong id="smartEta">—</strong><small>الوقت</small></div>
+    </div>
+
+    <div id="smartNextCard" class="smart-next-card">
+        <div class="smart-next-title">🎯 الطرد المثالي التالي</div>
+        <div id="smartNextText">اضغط «أقرب طرد» لحساب الجولة.</div>
+    </div>
+
+    <div id="smartDelayAlert" class="smart-delay-alert" style="display:none;"></div>
+
+    <div class="smart-tour-actions">
+        <button class="smart-action-primary" onclick="smartChooseNext()">🎯 الطرد المثالي التالي</button>
+        <button class="smart-action-secondary" onclick="updateSmartTourDashboard()">🔄 تحديث</button>
+    </div>
+</div>
+
+<div class="card history-tools-card" id="historyTools">
+    <div class="history-tools-head">
+        <div>
+            <div class="section-kicker">DELIVERY HISTORY</div>
+            <strong>🕘 سجل التسليم — آخر 14 يوم</strong>
+        </div>
+        <button class="history-date-btn" onclick="showHistoryDatePicker()">
+            📅 تاريخ سابق
+        </button>
+    </div>
+
+    <div class="history-toolbar">
+        <button class="history-day-btn active" id="historyTodayBtn"
+                onclick="showHistoryDay(0)">اليوم</button>
+        <button class="history-day-btn" id="historyYesterdayBtn"
+                onclick="showHistoryDay(1)">أمس</button>
+        <button class="history-day-btn" id="historyWeekBtn"
+                onclick="showHistoryDay(7)">قبل أسبوع</button>
+    </div>
+
+    <div class="history-search-row">
+        <input id="historySearchInput"
+               class="history-search-input"
+               type="search"
+               inputmode="search"
+               placeholder="بحث: اسم، عنوان، هاتف، باركود..."
+               oninput="filterHistory()">
+
+        <select id="historyStatusFilter"
+                class="history-status-filter"
+                onchange="filterHistory()">
+            <option value="all">كل الحالات</option>
+            <option value="delivered">تم التسليم</option>
+            <option value="absent">غياب</option>
+            <option value="pending">قيد الانتظار</option>
+            <option value="reattempt">إعادة محاولة</option>
+        </select>
+    </div>
+
+    <div class="history-summary" id="historySummary">
+        14 يوم · 0 طرد
+    </div>
+
+    <div id="historyDateModal" class="modal">
+        <div class="modal-content">
+            <h3>📅 اختر تاريخًا</h3>
+            <input id="historyDateInput"
+                   class="form-input"
+                   type="date">
+            <div class="modal-actions">
+                <button class="modal-btn" onclick="applyHistoryDate()">عرض</button>
+                <button class="modal-btn close-btn" onclick="closeHistoryDatePicker()">إغلاق</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card navigation-card" id="parcelNavigation">
         <div class="nav-title">
             <span>إدارة الطرود</span>
             <small>تنقّل سريع</small>
@@ -4485,6 +4676,8 @@ function markDelivered(index) {
             }
         }, 50);
     }
+
+    smartRecordDelivery();
 }
 
 window.markDelivered = markDelivered;
@@ -4659,6 +4852,499 @@ document.addEventListener("click", function(event) {
         console.error("Media viewer:", error);
     }
 });
+
+
+
+/* =========================================================
+   HISTORY — 14 DAYS + DATE PICKER + SEARCH + STATUS
+========================================================= */
+
+let historySelectedOffset = 0;
+let historySelectedDate = null;
+
+function startOfLocalDay(date) {
+    const d = new Date(date);
+    d.setHours(0, 0, 0, 0);
+    return d;
+}
+
+function parcelHistoryDate(parcel) {
+    if (!parcel) return null;
+
+    const raw =
+        parcel.deliveredAt ||
+        parcel.createdAt ||
+        parcel.date ||
+        null;
+
+    if (!raw) return null;
+
+    const d = new Date(raw);
+
+    if (Number.isNaN(d.getTime())) return null;
+
+    return d;
+}
+
+function isWithinLast14Days(parcel) {
+    const d = parcelHistoryDate(parcel);
+    if (!d) return false;
+
+    const today = startOfLocalDay(new Date());
+    const cutoff = new Date(today);
+    cutoff.setDate(today.getDate() - 13);
+
+    return d >= cutoff && d < new Date(today.getTime() + 86400000);
+}
+
+function sameLocalDay(a, b) {
+    if (!a || !b) return false;
+
+    return (
+        a.getFullYear() === b.getFullYear() &&
+        a.getMonth() === b.getMonth() &&
+        a.getDate() === b.getDate()
+    );
+}
+
+function statusLabel(status) {
+    if (status === "delivered") return "تم التسليم";
+    if (status === "absent") return "غياب";
+    if (status === "reattempt") return "إعادة محاولة";
+    return "قيد الانتظار";
+}
+
+function filterHistory() {
+    renderHistory14(
+        historySelectedOffset,
+        historySelectedDate
+    );
+}
+
+function showHistoryDay(offset) {
+    historySelectedOffset = Number(offset) || 0;
+    historySelectedDate = null;
+
+    document
+        .querySelectorAll(".history-day-btn")
+        .forEach(btn => btn.classList.remove("active"));
+
+    if (historySelectedOffset === 0) {
+        document.getElementById("historyTodayBtn")?.classList.add("active");
+    } else if (historySelectedOffset === 1) {
+        document.getElementById("historyYesterdayBtn")?.classList.add("active");
+    } else if (historySelectedOffset === 7) {
+        document.getElementById("historyWeekBtn")?.classList.add("active");
+    }
+
+    renderHistory14(historySelectedOffset, null);
+}
+
+function showHistoryDatePicker() {
+    const modal = document.getElementById("historyDateModal");
+    const input = document.getElementById("historyDateInput");
+
+    if (!modal || !input) return;
+
+    const max = new Date();
+    const min = new Date();
+    min.setDate(max.getDate() - 13);
+
+    input.max = max.toISOString().slice(0, 10);
+    input.min = min.toISOString().slice(0, 10);
+
+    const current = historySelectedDate || new Date();
+    input.value = current.toISOString().slice(0, 10);
+
+    modal.classList.add("show");
+}
+
+function closeHistoryDatePicker() {
+    document
+        .getElementById("historyDateModal")
+        ?.classList.remove("show");
+}
+
+function applyHistoryDate() {
+    const input =
+        document.getElementById("historyDateInput");
+
+    if (!input?.value) return;
+
+    const chosen = new Date(
+        input.value + "T00:00:00"
+    );
+
+    const today = startOfLocalDay(new Date());
+    const chosenDay = startOfLocalDay(chosen);
+    const diff =
+        Math.round(
+            (today - chosenDay) /
+            86400000
+        );
+
+    if (
+        diff < 0 ||
+        diff > 13
+    ) {
+        alert("يمكن الرجوع فقط إلى آخر 14 يومًا.");
+        return;
+    }
+
+    historySelectedDate = chosen;
+    historySelectedOffset = diff;
+
+    document
+        .querySelectorAll(".history-day-btn")
+        .forEach(btn => btn.classList.remove("active"));
+
+    closeHistoryDatePicker();
+    renderHistory14(diff, chosen);
+}
+
+function renderHistory14(offset = 0, selectedDate = null) {
+    const box =
+        document.getElementById("filteredParcelView");
+
+    if (!box) return;
+
+    const original =
+        document.getElementById("parcelsList");
+
+    const originalCard =
+        original
+            ? original.closest(".card")
+            : null;
+
+    if (originalCard) {
+        originalCard.style.display = "none";
+    }
+
+    box.style.display = "block";
+
+    const query =
+        String(
+            document.getElementById("historySearchInput")?.value || ""
+        )
+        .trim()
+        .toLowerCase();
+
+    const status =
+        document.getElementById("historyStatusFilter")?.value ||
+        "all";
+
+    let targetDay = selectedDate;
+
+    if (!targetDay) {
+        targetDay = new Date();
+        targetDay.setDate(
+            targetDay.getDate() - Number(offset || 0)
+        );
+    }
+
+    targetDay = startOfLocalDay(targetDay);
+
+    let list = parcels.filter(parcel => {
+        const d = parcelHistoryDate(parcel);
+        if (!d) return false;
+
+        if (!isWithinLast14Days(parcel)) return false;
+
+        if (!sameLocalDay(d, targetDay)) return false;
+
+        if (
+            status !== "all" &&
+            String(parcel.status || "pending") !== status
+        ) {
+            return false;
+        }
+
+        if (query) {
+            const haystack = [
+                parcel.name,
+                parcel.address,
+                parcel.street,
+                parcel.house,
+                parcel.zip,
+                parcel.city,
+                parcel.phone,
+                parcel.barcode,
+                parcel.notes,
+                statusLabel(parcel.status)
+            ]
+            .filter(Boolean)
+            .join(" ")
+            .toLowerCase();
+
+            if (!haystack.includes(query)) {
+                return false;
+            }
+        }
+
+        return true;
+    });
+
+    list.sort((a, b) => {
+        const da = parcelHistoryDate(a)?.getTime() || 0;
+        const db = parcelHistoryDate(b)?.getTime() || 0;
+        return db - da;
+    });
+
+    const label =
+        targetDay.toLocaleDateString(
+            "ar-DE",
+            {
+                weekday: "long",
+                day: "2-digit",
+                month: "long"
+            }
+        );
+
+    const summary =
+        document.getElementById("historySummary");
+
+    if (summary) {
+        summary.textContent =
+            `${label} · ${list.length} طرد`;
+    }
+
+    box.innerHTML = `
+        <div style="font-weight:900;color:#38bdf8;margin-bottom:8px">
+            🕘 ${label}
+            <span style="color:#94a3b8;font-size:10px">
+                · آخر 14 يوم
+            </span>
+        </div>
+        ${
+            list.length
+                ? list
+                    .map(
+                        p =>
+                            renderFilteredParcel(
+                                p,
+                                parcels.indexOf(p)
+                            )
+                    )
+                    .join("")
+                : `<div class="empty">
+                    لا توجد نتائج بهذا التاريخ/البحث.
+                   </div>`
+        }
+    `;
+}
+
+// Keep normal History button useful: show today's delivered history.
+const originalShowParcelView =
+    window.showParcelView;
+
+window.showParcelView =
+function(view) {
+    if (view === "history") {
+        showHistoryDay(0);
+        return;
+    }
+
+    if (typeof originalShowParcelView === "function") {
+        return originalShowParcelView(view);
+    }
+};
+
+// Re-render History automatically after a delivery or proof save.
+const originalMarkDelivered =
+    window.markDelivered;
+
+if (typeof originalMarkDelivered === "function") {
+    window.markDelivered =
+    async function(index) {
+        const result =
+            await originalMarkDelivered(index);
+
+        if (
+            document.getElementById("historySearchInput")
+        ) {
+            renderHistory14(
+                historySelectedOffset,
+                historySelectedDate
+            );
+        }
+
+        return result;
+    };
+}
+
+// Initialize the history toolbar safely.
+document.addEventListener(
+    "DOMContentLoaded",
+    function() {
+        if (
+            document.getElementById("historyTools")
+        ) {
+            renderHistory14(0, null);
+        }
+    }
+);
+
+
+
+function smartTodayDelivered() {
+    return parcels.filter(p =>
+        p && p.status === "delivered" && p.deliveredAt
+    ).sort((a,b) => new Date(a.deliveredAt) - new Date(b.deliveredAt));
+}
+
+function smartAverageStopMinutes() {
+    const done = smartTodayDelivered();
+    const intervals = [];
+
+    for (let i = 1; i < done.length; i++) {
+        const a = new Date(done[i-1].deliveredAt).getTime();
+        const b = new Date(done[i].deliveredAt).getTime();
+        const mins = (b - a) / 60000;
+        if (Number.isFinite(mins) && mins >= 0.5 && mins <= 30) intervals.push(mins);
+    }
+
+    if (!intervals.length) {
+        const stored = Number(localStorage.getItem("smart_avg_stop_minutes"));
+        return Number.isFinite(stored) && stored > 0 ? stored : null;
+    }
+
+    const avg = Math.max(1, Math.min(30,
+        intervals.reduce((a,b)=>a+b,0) / intervals.length
+    ));
+
+    const rounded = Number(avg.toFixed(1));
+    localStorage.setItem("smart_avg_stop_minutes", String(rounded));
+    return rounded;
+}
+
+function smartRemainingParcels() {
+    return parcels.filter(p =>
+        p &&
+        (p.status === "pending" || p.status === "reattempt")
+    );
+}
+
+function smartRouteDistanceKm() {
+    return smartRemainingParcels().reduce((sum,p) => {
+        const d = Number(p.routeDistanceKm);
+        return Number.isFinite(d) ? sum + d : sum;
+    }, 0);
+}
+
+function smartEstimateEndTime() {
+    const remaining = smartRemainingParcels().length;
+    if (!remaining) return null;
+
+    const avg = smartAverageStopMinutes() || 4;
+    const km = smartRouteDistanceKm();
+    const driveMinutes = Math.max(0, (km / 25) * 60);
+
+    return new Date(
+        Date.now() + (remaining * avg + driveMinutes) * 60000
+    );
+}
+
+function smartChooseNext() {
+    const list = smartRemainingParcels();
+    const box = document.getElementById("smartNextText");
+
+    if (!list.length) {
+        if (box) box.textContent = "✅ لا توجد طرود متبقية.";
+        return null;
+    }
+
+    const sorted = [...list].sort((a,b) => {
+        const ao = Number(a.routeOrder);
+        const bo = Number(b.routeOrder);
+
+        if (Number.isFinite(ao) && Number.isFinite(bo)) return ao - bo;
+
+        const ad = Number(a.routeDistanceKm);
+        const bd = Number(b.routeDistanceKm);
+
+        return (
+            (Number.isFinite(ad) ? ad : Infinity) -
+            (Number.isFinite(bd) ? bd : Infinity)
+        );
+    });
+
+    const p = sorted[0];
+    const idx = parcels.indexOf(p);
+    const km = Number(p.routeDistanceKm);
+    const dist = Number.isFinite(km) ? formatRouteDistance(km) : "المسافة غير محسوبة";
+
+    if (box) {
+        box.innerHTML =
+            `📦 ${escapeHTML(p.name || "بدون اسم")}<br>` +
+            `📍 ${escapeHTML(getAddress(p))}<br>` +
+            `📏 ${dist}<br>` +
+            (p.routeOrder ? `🔢 محطة ${p.routeOrder}<br>` : "") +
+            `<button class="action-btn map-btn" style="width:100%;margin-top:6px" onclick="openParcelNavigation(${idx})">🧭 اذهب الآن</button>`;
+    }
+
+    const badge = document.getElementById("smartTourBadge");
+    if (badge) badge.textContent = `التالي: ${p.routeOrder || "الأقرب"}`;
+
+    return p;
+}
+
+function smartUpdateDelayAlert() {
+    const box = document.getElementById("smartDelayAlert");
+    if (!box) return;
+
+    const avg = smartAverageStopMinutes() || 4;
+    const delayed = smartRemainingParcels().filter(p => {
+        const d = parcelHistoryDate(p);
+        if (!d) return false;
+        return ((Date.now() - d.getTime()) / 60000) > Math.max(45, avg * 8);
+    });
+
+    if (!delayed.length) {
+        box.style.display = "none";
+        box.textContent = "";
+        return;
+    }
+
+    box.style.display = "block";
+    box.innerHTML =
+        `⚠️ يوجد ${delayed.length} طرد متأخر نسبيًا. ` +
+        `يمكنك إعادة حساب المسار لإعطاءه أولوية.`;
+}
+
+function updateSmartTourDashboard() {
+    const rem = smartRemainingParcels();
+    const km = smartRouteDistanceKm();
+    const avg = smartAverageStopMinutes();
+    const eta = smartEstimateEndTime();
+
+    const set = (id, value) => {
+        const el = document.getElementById(id);
+        if (el) el.textContent = value;
+    };
+
+    set("smartRemaining", String(rem.length));
+    set("smartDistance", km.toFixed(1));
+    set("smartAvgStop", avg ? avg.toFixed(1) : "—");
+    set("smartEta", eta ? eta.toLocaleTimeString("de-DE",{hour:"2-digit",minute:"2-digit"}) : "—");
+
+    const badge = document.getElementById("smartTourBadge");
+    if (badge) badge.textContent = rem.length ? "جاري الجولة" : "منتهية";
+
+    smartChooseNext();
+    smartUpdateDelayAlert();
+}
+
+function smartRecordDelivery() {
+    try {
+        smartAverageStopMinutes();
+        updateSmartTourDashboard();
+    } catch (e) {
+        console.log("Smart tour:", e);
+    }
+}
+
+setInterval(smartUpdateDelayAlert, 60000);
+document.addEventListener("DOMContentLoaded", updateSmartTourDashboard);
 
 </script>
 
