@@ -405,17 +405,427 @@
             display: none;
         }
 
+    
+/* =========================================================
+           MODERN PRO DELIVERY UI
+           Keeps existing IDs, handlers and parcel logic unchanged.
+           ========================================================= */
 
-        .signature-canvas { width:100%; height:170px; background:#fff; border-radius:7px; touch-action:none; }
-        .route-mini { background:#172554; border:1px solid #2563eb; padding:6px; border-radius:6px; margin:5px 0; }
-        .filter-card { background:#334155; border:1px solid #475569; padding:8px; border-radius:7px; margin-bottom:7px; }
+        :root {
+            --bg: #07111f;
+            --panel: rgba(17, 29, 48, .92);
+            --panel-2: rgba(22, 37, 60, .94);
+            --line: rgba(148, 163, 184, .16);
+            --text: #f8fafc;
+            --muted: #94a3b8;
+            --blue: #38bdf8;
+            --violet: #8b5cf6;
+            --green: #34d399;
+            --yellow: #fbbf24;
+            --pink: #f472b6;
+        }
+
+        html {
+            background: var(--bg);
+            min-height: 100%;
+        }
+
+        body {
+            min-height: 100vh;
+            padding:
+                max(10px, env(safe-area-inset-top))
+                12px
+                calc(88px + env(safe-area-inset-bottom));
+            background:
+                radial-gradient(circle at 85% 0%, rgba(56,189,248,.16), transparent 30%),
+                radial-gradient(circle at 10% 20%, rgba(139,92,246,.13), transparent 28%),
+                linear-gradient(180deg, #07111f 0%, #0a1322 55%, #07111f 100%);
+            color: var(--text);
+        }
+
+        .app-header {
+            position: relative;
+            overflow: hidden;
+            margin: 2px 0 14px;
+            padding: 16px;
+            border: 1px solid rgba(148,163,184,.16);
+            border-radius: 24px;
+            background:
+                linear-gradient(135deg, rgba(30,41,59,.94), rgba(15,23,42,.90));
+            box-shadow: 0 16px 45px rgba(0,0,0,.25);
+        }
+
+        .app-header::after {
+            content: "";
+            position: absolute;
+            width: 160px;
+            height: 160px;
+            border-radius: 50%;
+            left: -65px;
+            top: -75px;
+            background: rgba(56,189,248,.10);
+            filter: blur(2px);
+        }
+
+        .brand-row,
+        .time-panel {
+            position: relative;
+            z-index: 1;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+        }
+
+        .brand-row {
+            margin-bottom: 15px;
+        }
+
+        .brand-icon {
+            width: 50px;
+            height: 50px;
+            display: grid;
+            place-items: center;
+            flex: 0 0 50px;
+            border-radius: 17px;
+            font-size: 27px;
+            background: linear-gradient(135deg, #2563eb, #7c3aed);
+            box-shadow: 0 10px 25px rgba(37,99,235,.28);
+        }
+
+        .brand-copy {
+            flex: 1;
+            text-align: right;
+        }
+
+        .brand-title {
+            font-size: 22px;
+            font-weight: 900;
+            letter-spacing: -.4px;
+        }
+
+        .brand-subtitle {
+            margin-top: 2px;
+            color: var(--muted);
+            font-size: 11px;
+        }
+
+        .live-badge {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 7px 9px;
+            border-radius: 999px;
+            background: rgba(52,211,153,.10);
+            border: 1px solid rgba(52,211,153,.20);
+            color: #86efac;
+            font-size: 10px;
+            font-weight: 800;
+            white-space: nowrap;
+        }
+
+        .live-badge span,
+        .status-dot {
+            width: 7px;
+            height: 7px;
+            border-radius: 50%;
+            background: var(--green);
+            box-shadow: 0 0 0 4px rgba(52,211,153,.10), 0 0 12px rgba(52,211,153,.7);
+        }
+
+        .time-panel {
+            padding: 12px 13px;
+            border-radius: 17px;
+            background: rgba(2,6,23,.30);
+            border: 1px solid rgba(148,163,184,.10);
+        }
+
+        .live-time {
+            font-size: 27px;
+            line-height: 1;
+            font-weight: 900;
+            letter-spacing: 1px;
+            direction: ltr;
+            text-align: right;
+        }
+
+        .live-date {
+            margin-top: 5px;
+            color: var(--muted);
+            font-size: 10px;
+        }
+
+        .driver-status {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            color: #cbd5e1;
+            font-size: 11px;
+            font-weight: 700;
+        }
+
+        .stats-grid {
+            gap: 8px;
+            margin-bottom: 14px;
+        }
+
+        .stat-box {
+            position: relative;
+            overflow: hidden;
+            min-height: 76px;
+            padding: 12px 8px;
+            border-radius: 18px;
+            border: 1px solid var(--line);
+            background: linear-gradient(145deg, rgba(20,34,55,.96), rgba(13,24,40,.96));
+            box-shadow: 0 8px 24px rgba(0,0,0,.14);
+            font-size: 11px;
+        }
+
+        .stat-box::before {
+            content: "";
+            position: absolute;
+            width: 46px;
+            height: 46px;
+            border-radius: 50%;
+            left: -18px;
+            bottom: -24px;
+            background: rgba(56,189,248,.08);
+        }
+
+        .stat-box span {
+            font-size: 22px;
+            margin-top: 7px;
+        }
+
+        .section-heading {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin: 3px 3px 8px;
+            color: #e2e8f0;
+        }
+
+        .section-heading > div {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+
+        .section-kicker {
+            color: #64748b;
+            font-size: 8px;
+            font-weight: 900;
+            letter-spacing: 1.5px;
+        }
+
+        .section-heading strong {
+            font-size: 15px;
+        }
+
+        .section-icon {
+            width: 34px;
+            height: 34px;
+            display: grid;
+            place-items: center;
+            border-radius: 12px;
+            background: rgba(139,92,246,.12);
+            border: 1px solid rgba(139,92,246,.20);
+        }
+
+        .card {
+            border-radius: 20px;
+            border: 1px solid var(--line);
+            background: var(--panel);
+            box-shadow: 0 12px 35px rgba(0,0,0,.18);
+            backdrop-filter: blur(14px);
+        }
+
+        .tools-card {
+            padding: 12px;
+        }
+
+        .action-main-btn {
+            min-height: 50px;
+            margin-bottom: 8px;
+            padding: 12px 14px;
+            border-radius: 15px;
+            font-size: 13px;
+            box-shadow: 0 7px 18px rgba(0,0,0,.13);
+            transition: transform .15s ease, filter .15s ease;
+        }
+
+        .action-main-btn:hover {
+            filter: brightness(1.08);
+        }
+
+        .action-main-btn:active {
+            transform: translateY(1px) scale(.985);
+        }
+
+        .loading {
+            padding: 9px;
+            border-radius: 12px;
+            background: rgba(251,191,36,.08);
+        }
+
+        .connection {
+            margin: 9px 0 1px;
+            color: #86efac;
+        }
+
+        .next-stop {
+            border-radius: 18px;
+            margin: 10px 0;
+            box-shadow: 0 10px 30px rgba(0,0,0,.18);
+        }
+
+        .navigation-card {
+            padding: 12px;
+        }
+
+        .nav-title {
+            display: flex;
+            justify-content: space-between;
+            align-items: baseline;
+            margin: 0 3px 10px;
+        }
+
+        .nav-title span {
+            font-size: 15px;
+            font-weight: 900;
+        }
+
+        .nav-title small {
+            color: var(--muted);
+            font-size: 9px;
+        }
+
+        .parcel-nav-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 7px;
+        }
+
+        .nav-tile {
+            min-width: 0;
+            min-height: 70px;
+            padding: 8px 4px;
+            border: 1px solid transparent;
+            border-radius: 16px;
+            color: #f8fafc;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 5px;
+            font: inherit;
+            font-size: 10px;
+            font-weight: 800;
+            cursor: pointer;
+            transition: transform .15s ease, filter .15s ease;
+        }
+
+        .nav-tile:active {
+            transform: scale(.96);
+        }
+
+        .nav-tile-icon {
+            font-size: 21px;
+            line-height: 1;
+        }
+
+        .nav-route {
+            background: linear-gradient(145deg, #1d4ed8, #2563eb);
+        }
+
+        .nav-today {
+            background: linear-gradient(145deg, #047857, #0f766e);
+        }
+
+        .nav-all {
+            background: linear-gradient(145deg, #334155, #475569);
+        }
+
+        .nav-history {
+            background: linear-gradient(145deg, #6d28d9, #7c3aed);
+        }
+
+        #filteredParcelView {
+            border-top: 1px solid var(--line);
+            padding-top: 10px;
+        }
+
+        li {
+            border-radius: 16px;
+            border: 1px solid rgba(148,163,184,.13);
+            background: linear-gradient(145deg, rgba(30,41,59,.95), rgba(15,23,42,.92));
+            box-shadow: 0 8px 22px rgba(0,0,0,.12);
+        }
+
+        .filter-card {
+            border-radius: 15px;
+            background: rgba(30,41,59,.78);
+            border-color: rgba(148,163,184,.12);
+        }
+
+        .route-mini {
+            border-radius: 12px;
+            background: rgba(30,64,175,.22);
+            border-color: rgba(59,130,246,.30);
+        }
+
+        /* Compact phones */
+        @media (max-width: 380px) {
+            body {
+                padding-left: 9px;
+                padding-right: 9px;
+            }
+
+            .brand-title {
+                font-size: 19px;
+            }
+
+            .live-time {
+                font-size: 24px;
+            }
+
+            .nav-tile {
+                min-height: 64px;
+                font-size: 9px;
+            }
+
+            .nav-tile-icon {
+                font-size: 19px;
+            }
+        }
+
+    
     </style>
 </head>
 
 
 <body>
 
-    <h1>📦 Pro Delivery</h1>
+    <header class="app-header">
+        <div class="brand-row">
+            <div class="brand-icon">📦</div>
+            <div class="brand-copy">
+                <div class="brand-title">Pro Delivery</div>
+                <div class="brand-subtitle">مساعد توصيل ذكي</div>
+            </div>
+            <div class="live-badge"><span></span> مباشر</div>
+        </div>
+        <div class="time-panel">
+            <div>
+                <div id="liveTime" class="live-time">--:--</div>
+                <div id="liveDate" class="live-date">---</div>
+            </div>
+            <div class="driver-status">
+                <span class="status-dot"></span>
+                جاهز للعمل
+            </div>
+        </div>
+    </header>
 
 
     <!-- الإحصائيات -->
@@ -484,7 +894,15 @@
 
     <!-- التحكم -->
 
-    <div class="card">
+    <div class="section-heading">
+        <div>
+            <span class="section-kicker">SMART TOOLS</span>
+            <strong>أدوات التوصيل</strong>
+        </div>
+        <span class="section-icon">⚡</span>
+    </div>
+
+    <div class="card tools-card">
 
         <!-- AI Camera -->
 
@@ -492,7 +910,7 @@
             id="aiScanBtn"
             class="action-main-btn ai-btn"
         >
-            🤖 📷 قراءة العنوان بالـAI
+            🤖 📷 قراءة العنوان مجانًا
         </button>
 
         <input
@@ -559,7 +977,7 @@
         <button
             class="action-main-btn"
             style="background:#0ea5e9;"
-            onclick="optimizeRouteSafe()"
+            onclick="optimizeRoute()"
         >
             🗺️ أقرب طرد
         </button>
@@ -599,16 +1017,6 @@
         id="nextStop"
         class="next-stop"
     ></div>
-
-    <div class="card" id="parcelNavigation" style="padding:7px;">
-        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:4px;">
-            <button class="action-btn map-btn" onclick="showParcelView('route')">🚚 المسار</button>
-            <button class="action-btn" style="background:#0f766e;" onclick="showParcelView('today')">📅 اليوم</button>
-            <button class="action-btn" style="background:#475569;" onclick="showParcelView('all')">📦 الكل</button>
-            <button class="action-btn" style="background:#7c3aed;" onclick="showParcelView('history')">🕘 History</button>
-        </div>
-        <div id="filteredParcelView" style="margin-top:7px;display:none;"></div>
-    </div>
 
 
     <!-- الطرود -->
@@ -925,213 +1333,532 @@ initAI();
 
 
 /* =====================================================
-   AI CAMERA
+   FREE LOCAL DOCUMENT SCANNER
+   - No OpenAI
+   - No Cloudflare
+   - OCR runs in the browser
 ===================================================== */
 
-const AI_BACKEND_URL =
-    "https://pro-delivery-ai.yasserkhalil.workers.dev";
-
-const GEOCODE_BACKEND_URL = AI_BACKEND_URL + "/geocode";
+let localOCRWorker = null;
+let localOCRPromise = null;
+let zxingPromise = null;
 
 
 function initAI() {
 
-    const button =
-        document.getElementById(
-            "aiScanBtn"
+    const button = document.getElementById("aiScanBtn");
+    const input = document.getElementById("aiCameraInput");
+
+    if (!button || !input) return;
+
+    button.addEventListener("click", () => input.click());
+
+    input.addEventListener("change", async event => {
+
+        const file = event.target.files?.[0];
+        event.target.value = "";
+
+        if (!file) return;
+
+        await runLocalDocumentScan(file, button);
+    });
+}
+
+
+async function runLocalDocumentScan(file, button) {
+
+    showLoading(true);
+    button.disabled = true;
+    button.innerText = "📷 جاري قراءة الورقة محليًا...";
+
+    try {
+
+        const result = await scanDocumentLocally(file);
+
+        openParcelForm(result);
+
+    } catch (error) {
+
+        console.error("LOCAL SCANNER ERROR", error);
+
+        alert(
+            "تعذر قراءة الورقة:\n\n" +
+            (error?.message || "خطأ غير معروف")
         );
 
-    const input =
-        document.getElementById(
-            "aiCameraInput"
+    } finally {
+
+        showLoading(false);
+        button.disabled = false;
+        button.innerText = "🤖 📷 قراءة العنوان مجانًا";
+    }
+}
+
+
+async function loadTesseractScript() {
+
+    if (window.Tesseract) return window.Tesseract;
+
+    return new Promise((resolve, reject) => {
+
+        const script = document.createElement("script");
+        script.src = "https://cdn.jsdelivr.net/npm/tesseract.js@7.0.0/dist/tesseract.min.js";
+        script.async = true;
+
+        script.onload = () => resolve(window.Tesseract);
+        script.onerror = () => reject(
+            new Error("تعذر تحميل محرك OCR. تأكد من اتصال الإنترنت.")
         );
 
-    if (!button || !input)
-        return;
+        document.head.appendChild(script);
+    });
+}
 
 
-    button.addEventListener(
-        "click",
-        () => {
+async function getOCRWorker() {
 
-            input.click();
+    if (localOCRWorker) return localOCRWorker;
+    if (localOCRPromise) return localOCRPromise;
 
-        }
-    );
+    localOCRPromise = (async () => {
 
+        const TesseractLib = await loadTesseractScript();
 
-    input.addEventListener(
-        "change",
-        async event => {
+        // German + English is appropriate for German delivery labels.
+        const worker = await TesseractLib.createWorker("deu+eng", 1, {
+            logger: message => {
 
-            const file =
-                event.target.files?.[0];
+                if (message?.status === "recognizing text" && message.progress) {
 
-            event.target.value = "";
+                    const percent = Math.round(message.progress * 100);
 
-            if (!file)
-                return;
-
-
-            showLoading(true);
-
-            button.disabled = true;
-
-            button.innerText =
-                "🤖 جاري تحليل الورقة...";
-
-
-            try {
-
-                const image =
-                    await fileToDataURL(
-                        file
-                    );
-
-
-                const result =
-                    await analyzeAddressWithAI(
-                        image
-                    );
-
-
-                openParcelForm(
-                    result
-                );
-
-
-            } catch(error) {
-
-                console.error(error);
-
-                alert(
-                    "تعذر تحليل الصورة:\n\n" +
-                    error.message
-                );
-
-            } finally {
-
-                showLoading(false);
-
-                button.disabled =
-                    false;
-
-                button.innerText =
-                    "🤖 📷 قراءة العنوان بالـAI";
+                    const loading = document.getElementById("loading");
+                    if (loading) {
+                        loading.innerText =
+                            `⏳ جاري قراءة الورقة محليًا... ${percent}%`;
+                    }
+                }
             }
+        });
 
-        }
-    );
+        localOCRWorker = worker;
+        return worker;
+
+    })();
+
+    try {
+        return await localOCRPromise;
+    } catch (error) {
+        localOCRPromise = null;
+        throw error;
+    }
 }
 
 
-function fileToDataURL(file) {
+function loadImage(file) {
 
-    return new Promise(
-        (resolve, reject) => {
+    return new Promise((resolve, reject) => {
 
-            const reader =
-                new FileReader();
+        const reader = new FileReader();
+        const img = new Image();
 
-            reader.onload =
-                () =>
-                    resolve(
-                        reader.result
-                    );
+        reader.onload = () => {
+            img.onload = () => resolve(img);
+            img.onerror = () => reject(new Error("تعذر فتح الصورة."));
+            img.src = reader.result;
+        };
 
-            reader.onerror =
-                () =>
-                    reject(
-                        new Error(
-                            "تعذر قراءة الصورة."
-                        )
-                    );
-
-            reader.readAsDataURL(
-                file
-            );
-        }
-    );
+        reader.onerror = () => reject(new Error("تعذر قراءة الصورة."));
+        reader.readAsDataURL(file);
+    });
 }
 
 
-async function analyzeAddressWithAI(
-    image
-) {
+function makeOCRCanvas(img, mode = "normal") {
 
-    if (
-        !AI_BACKEND_URL ||
-        AI_BACKEND_URL.includes(
-            "ضع_هنا"
-        )
-    ) {
+    const maxSide = 3000;
+    const longest = Math.max(img.naturalWidth, img.naturalHeight);
+    const scale = Math.min(1, maxSide / longest);
 
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.max(1, Math.round(img.naturalWidth * scale));
+    canvas.height = Math.max(1, Math.round(img.naturalHeight * scale));
+
+    const ctx = canvas.getContext("2d", { alpha: false });
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = "high";
+
+    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+
+    if (mode === "normal") return canvas;
+
+    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    const px = imageData.data;
+
+    for (let i = 0; i < px.length; i += 4) {
+
+        const r = px[i];
+        const g = px[i + 1];
+        const b = px[i + 2];
+
+        let gray =
+            0.299 * r +
+            0.587 * g +
+            0.114 * b;
+
+        if (mode === "contrast") {
+            gray = Math.max(0, Math.min(255, (gray - 128) * 1.65 + 128));
+        }
+
+        if (mode === "threshold") {
+            gray = gray > 165 ? 255 : 0;
+        }
+
+        px[i] = gray;
+        px[i + 1] = gray;
+        px[i + 2] = gray;
+    }
+
+    ctx.putImageData(imageData, 0, 0);
+
+    return canvas;
+}
+
+
+async function recognizeOCR(worker, image, label) {
+
+    const loading = document.getElementById("loading");
+    if (loading) loading.innerText = `⏳ ${label}`;
+
+    const result = await worker.recognize(image);
+
+    return {
+        text: String(result?.data?.text || "").trim(),
+        confidence: Number(result?.data?.confidence || 0)
+    };
+}
+
+
+function scoreOCR(text, confidence) {
+
+    let score = confidence;
+
+    if (/\b\d{5}\b/.test(text)) score += 35;
+    if (/\b(Göttingen|Goettingen|Berlin|Hamburg|München|Munich|Köln|Frankfurt)\b/i.test(text)) score += 10;
+    if (/\b(Herr|Frau)\b/i.test(text)) score += 4;
+    if (/\d+[a-zA-Z]?\s*$/m.test(text)) score += 12;
+    if (/Straße|Strasse|Str\.|Weg|Allee|Platz|Ring|Gasse/i.test(text)) score += 15;
+
+    return score;
+}
+
+
+async function scanDocumentLocally(file) {
+
+    const worker = await getOCRWorker();
+    const img = await loadImage(file);
+
+    // Two passes give a useful accuracy boost on photographed paper:
+    // a normal image and a contrast-enhanced image.
+    const canvases = [
+        makeOCRCanvas(img, "normal"),
+        makeOCRCanvas(img, "contrast")
+    ];
+
+    const results = [];
+
+    for (let i = 0; i < canvases.length; i++) {
+
+        const result = await recognizeOCR(
+            worker,
+            canvases[i],
+            i === 0
+                ? "جاري قراءة النص..."
+                : "جاري تحسين القراءة..."
+        );
+
+        if (result.text) results.push(result);
+    }
+
+    if (!results.length) {
         throw new Error(
-            "ضع رابط الـBackend في AI_BACKEND_URL داخل index.html."
+            "لم يتمكن OCR من قراءة النص. صوّر الورقة بشكل مستقيم وبإضاءة جيدة."
         );
     }
 
+    results.sort(
+        (a, b) => scoreOCR(b.text, b.confidence) - scoreOCR(a.text, a.confidence)
+    );
 
-    const response =
-        await fetch(
-            AI_BACKEND_URL,
-            {
-                method: "POST",
+    const best = results[0];
+    const parsed = parseAddressText(best.text);
 
-                headers: {
-                    "Content-Type":
-                        "application/json"
-                },
+    // Try QR/barcode directly from the original photo as well.
+    try {
+        const code = await detectBarcodeFromImage(file);
+        if (code) parsed.barcode = code;
+    } catch (error) {
+        console.debug("Barcode image detection unavailable:", error);
+    }
 
-                body: JSON.stringify({
-                    image: image
-                })
+    parsed.raw_text = best.text;
+    parsed.ocr_confidence = Math.round(best.confidence);
+
+    return parsed;
+}
+
+
+function parseAddressText(text) {
+
+    const clean = String(text || "")
+        .replace(/\r/g, "")
+        .replace(/[|]/g, " ")
+        .replace(/[\t]+/g, " ")
+        .replace(/ {2,}/g, " ");
+
+    const lines = clean
+        .split("\n")
+        .map(x => x.replace(/^[\s•·,;:]+|[\s•·,;:]+$/g, "").trim())
+        .filter(x => x.length >= 2);
+
+    const zipMatch = clean.match(/\b(\d{5})\b/);
+    const zip = zipMatch ? zipMatch[1] : "";
+
+    let city = "";
+    let zipLineIndex = -1;
+
+    if (zip) {
+
+        zipLineIndex = lines.findIndex(line => line.includes(zip));
+
+        const zipLine = zipLineIndex >= 0 ? lines[zipLineIndex] : "";
+        const afterZip = zipLine
+            .replace(zip, "")
+            .replace(/^[\s,.-]+/, "")
+            .trim();
+
+        if (afterZip && !/^\d+$/.test(afterZip)) {
+            city = normalizeGerman(afterZip);
+        }
+    }
+
+    // If the city is on the line after the PLZ, use it.
+    if (!city && zipLineIndex >= 0 && lines[zipLineIndex + 1]) {
+        const candidate = lines[zipLineIndex + 1].trim();
+        if (
+            candidate.length >= 2 &&
+            !/^(Datum|Date|Zeichen|Ihr|Ihre|Herr|Frau)\b/i.test(candidate)
+        ) {
+            city = normalizeGerman(candidate);
+        }
+    }
+
+    let street = "";
+    let house = "";
+    let streetIndex = -1;
+
+    // German street/address line: "St.-Heinrich-Straße 28", "Hauptstr. 12a", etc.
+    const streetRegex = /^(.+?)\s+(\d+[a-zA-Z]?\s*(?:[-/]\s*\d+[a-zA-Z]?)?)\s*$/;
+
+    for (let i = 0; i < lines.length; i++) {
+
+        const candidate = lines[i]
+            .replace(/^(Herr|Frau)\s+/i, "")
+            .trim();
+
+        const match = candidate.match(streetRegex);
+
+        if (!match) continue;
+
+        const possibleStreet = match[1].trim();
+
+        if (
+            /straße|strasse|str\.?\b|weg\b|allee\b|platz\b|ring\b|gasse\b|chaussee\b|ufer\b/i.test(possibleStreet) ||
+            /[.-]/.test(possibleStreet)
+        ) {
+            street = normalizeGerman(possibleStreet);
+            house = match[2].replace(/\s+/g, "").trim();
+            streetIndex = i;
+            break;
+        }
+    }
+
+    // Fallback: any line ending with a house number.
+    if (!street) {
+        for (let i = 0; i < lines.length; i++) {
+            const match = lines[i].match(streetRegex);
+            if (match) {
+                street = normalizeGerman(match[1]);
+                house = match[2].replace(/\s+/g, "");
+                streetIndex = i;
+                break;
             }
-        );
+        }
+    }
+
+    // Strong fallback for a PLZ + city embedded in the full OCR text.
+    if (!city && zip) {
+        const cityMatch = clean.match(new RegExp(
+            "\\b" + zip + "\\s+([A-Za-zÄÖÜäöüßÀ-ÿ][A-Za-zÄÖÜäöüßÀ-ÿ .-]{2,})"
+        ));
+        if (cityMatch) city = normalizeGerman(cityMatch[1]);
+    }
+
+    // Phone numbers.
+    const phoneMatch = clean.match(
+        /(?:\+49|0049|0)\s*(?:\(?\d{2,5}\)?[\s./-]*)\d[\d\s./-]{5,}\d/g
+    );
+
+    const phone = phoneMatch
+        ? phoneMatch[0].replace(/\s{2,}/g, " ").trim()
+        : "";
+
+    // The recipient is usually immediately before the street line.
+    let name = "";
+
+    if (streetIndex > 0) {
+
+        for (let i = streetIndex - 1; i >= 0; i--) {
+
+            let candidate = lines[i]
+                .replace(/^(Herr|Frau)\s*/i, "")
+                .trim();
+
+            if (!candidate) continue;
+
+            if (/^(STADT|FACHBEREICH|DATUM|ZEICHEN|IHR|IHRE|SEHR|BETREFF|AN|VON)\b/i.test(candidate)) {
+                continue;
+            }
+
+            if (/\d{5}/.test(candidate)) continue;
+
+            name = candidate;
+            break;
+        }
+    }
+
+    if (!name) {
+
+        const herrLine = lines.find(x => /^(Herr|Frau)\b/i.test(x));
+
+        if (herrLine) {
+            name = herrLine.replace(/^(Herr|Frau)\s*/i, "").trim();
+        }
+    }
+
+    // Remove obvious OCR noise from the name.
+    name = name.replace(/^[:;,.\-]+|[:;,.\-]+$/g, "").trim();
+
+    return {
+        name,
+        street,
+        house,
+        zip,
+        city,
+        phone,
+        barcode: "",
+        raw_text: clean
+    };
+}
 
 
-    if (!response.ok) {
+function normalizeGerman(value) {
 
-        let message =
-            "فشل الاتصال بالـAI.";
+    return String(value || "")
+        .replace(/\bGoettingen\b/gi, "Göttingen")
+        .replace(/\bStrasse\b/gi, "Straße")
+        .replace(/\bStr\s*\.?\b/gi, "Str.")
+        .replace(/\s+/g, " ")
+        .trim();
+}
+
+
+async function detectBarcodeFromImage(file) {
+
+    // Native BarcodeDetector when available.
+    if ("BarcodeDetector" in window) {
 
         try {
 
-            const data =
-                await response.json();
+            const supported = await BarcodeDetector.getSupportedFormats();
 
-            message =
-                data.error ||
-                message;
+            const preferred = [
+                "qr_code",
+                "code_128",
+                "code_39",
+                "code_93",
+                "ean_13",
+                "ean_8",
+                "itf",
+                "pdf417",
+                "data_matrix",
+                "aztec",
+                "upc_a",
+                "upc_e"
+            ];
 
-        } catch {}
+            const formats = preferred.filter(x => supported.includes(x));
 
-        throw new Error(
-            message
-        );
+            if (formats.length) {
+
+                const detector = new BarcodeDetector({ formats });
+                const bitmap = await createImageBitmap(file);
+                const codes = await detector.detect(bitmap);
+
+                if (bitmap.close) bitmap.close();
+
+                if (codes?.[0]?.rawValue) {
+                    return codes[0].rawValue;
+                }
+            }
+
+        } catch (error) {
+            console.debug("Native barcode detector failed:", error);
+        }
     }
 
+    // QR fallback for browsers without BarcodeDetector.
+    try {
 
-    const data =
-        await response.json();
+        const jsQR = await loadJsQR();
+        const img = await loadImage(file);
+        const canvas = makeOCRCanvas(img, "normal");
+        const ctx = canvas.getContext("2d", { willReadFrequently: true });
+        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        const code = jsQR(imageData.data, imageData.width, imageData.height, {
+            inversionAttempts: "attemptBoth"
+        });
 
+        if (code?.data) return code.data;
 
-    if (!data.success) {
-
-        throw new Error(
-            data.error ||
-            "فشل تحليل الصورة."
-        );
+    } catch (error) {
+        console.debug("QR fallback failed:", error);
     }
 
+    return "";
+}
 
-    return data.data || {};
+
+function loadJsQR() {
+
+    if (window.jsQR) return Promise.resolve(window.jsQR);
+
+    return new Promise((resolve, reject) => {
+
+        const script = document.createElement("script");
+        script.src = "https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js";
+        script.async = true;
+        script.onload = () => resolve(window.jsQR);
+        script.onerror = () => reject(new Error("تعذر تحميل قارئ QR."));
+        document.head.appendChild(script);
+    });
 }
 
 
 /* =====================================================
    OPEN PARCEL FORM
 ===================================================== */
+
 
 function openParcelForm(
     data = {}
@@ -1187,7 +1914,7 @@ function openParcelForm(
     document.getElementById(
         "fNotes"
     ).value =
-        data.raw_text || "";
+        data.notes || "";
 
 
     document.getElementById(
@@ -1261,46 +1988,6 @@ function saveParcelForm() {
         proofUrl:
             index !== ""
                 ? parcels[index].proofUrl
-                : null,
-
-        createdAt:
-            index !== ""
-                ? (parcels[index].createdAt || new Date().toISOString())
-                : new Date().toISOString(),
-
-        deliveredAt:
-            index !== ""
-                ? parcels[index].deliveredAt || null
-                : null,
-
-        signatureUrl:
-            index !== ""
-                ? parcels[index].signatureUrl || null
-                : null,
-
-        signatureAt:
-            index !== ""
-                ? parcels[index].signatureAt || null
-                : null,
-
-        lat:
-            index !== ""
-                ? parcels[index].lat ?? null
-                : null,
-
-        lon:
-            index !== ""
-                ? parcels[index].lon ?? null
-                : null,
-
-        routeOrder:
-            index !== ""
-                ? parcels[index].routeOrder ?? null
-                : null,
-
-        routeDistanceKm:
-            index !== ""
-                ? parcels[index].routeDistanceKm ?? null
                 : null
     };
 
@@ -1513,214 +2200,18 @@ function deg2rad(deg) {
 
 
 /* =====================================================
-   LOCAL OCR
+   LOCAL OCR / CAMERA
 ===================================================== */
-
-async function loadTesseractScript() {
-
-    if (
-        window.Tesseract
-    ) {
-
-        return window.Tesseract;
-    }
-
-
-    return new Promise(
-        (resolve, reject) => {
-
-            const script =
-                document.createElement(
-                    "script"
-                );
-
-            script.src =
-                "https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js";
-
-            script.onload =
-                () =>
-                    resolve(
-                        window.Tesseract
-                    );
-
-            script.onerror =
-                reject;
-
-            document.head.appendChild(
-                script
-            );
-        }
-    );
-}
-
 
 async function processImage(event) {
 
-    const file =
-        event.target.files?.[0];
+    const file = event.target.files?.[0];
+    event.target.value = "";
 
-    if (!file)
-        return;
+    if (!file) return;
 
-
-    showLoading(true);
-
-
-    try {
-
-        const TesseractLib =
-            await loadTesseractScript();
-
-
-        const result =
-            await TesseractLib.recognize(
-                file,
-                "eng+deu"
-            );
-
-
-        const text =
-            result.data.text.trim();
-
-
-        const parsed =
-            parseAddressText(
-                text
-            );
-
-
-        openParcelForm(
-            parsed
-        );
-
-
-    } catch(error) {
-
-        console.error(error);
-
-        alert(
-            "خطأ بقراءة الصورة."
-        );
-
-    } finally {
-
-        showLoading(false);
-
-        event.target.value = "";
-    }
-}
-
-
-function parseAddressText(
-    text
-) {
-
-    const lines =
-        text
-            .split(/\r?\n/)
-            .map(
-                x => x.trim()
-            )
-            .filter(
-                x =>
-                    x.length > 2
-            );
-
-
-    const zipMatch =
-        text.match(
-            /\b\d{5}\b/
-        );
-
-
-    const zip =
-        zipMatch
-            ? zipMatch[0]
-            : "";
-
-
-    let street = "";
-    let house = "";
-
-
-    for (
-        const line
-        of lines
-    ) {
-
-        const match =
-            line.match(
-                /^(.+?)\s+(\d+[a-zA-Z]?(?:-\d+[a-zA-Z]?)?)$/
-            );
-
-
-        if (match) {
-
-            street =
-                match[1].trim();
-
-            house =
-                match[2].trim();
-
-            break;
-        }
-    }
-
-
-    let city = "";
-
-
-    if (zip) {
-
-        const afterZip =
-            text
-                .slice(
-                    text.indexOf(zip) + 5
-                )
-                .split(/\r?\n/)
-                .map(
-                    x =>
-                        x.trim()
-                )
-                .filter(Boolean);
-
-
-        city =
-            afterZip[0] || "";
-    }
-
-
-    const phoneMatch =
-        text.match(
-            /(?:\+49|0049|0)\s?[\d\s()/.-]{8,}/
-        );
-
-
-    return {
-
-        name:
-            lines[1] ||
-            lines[0] ||
-            "",
-
-        street,
-
-        house,
-
-        zip,
-
-        city,
-
-        phone:
-            phoneMatch
-                ? phoneMatch[0].trim()
-                : "",
-
-        barcode: "",
-
-        raw_text:
-            text
-    };
+    const button = document.getElementById("aiScanBtn");
+    await runLocalDocumentScan(file, button || { disabled:false, innerText:"" });
 }
 
 
@@ -1837,144 +2328,248 @@ function startVoiceInput() {
 
 async function scanBarcode() {
 
-    if (
-        !("BarcodeDetector" in window)
-    ) {
+    // First try native BarcodeDetector for a fast scanner.
+    if ("BarcodeDetector" in window) {
 
-        alert(
-            "BarcodeDetector غير مدعوم في هذا المتصفح. استخدم Chrome حديث."
-        );
+        try {
 
-        return;
+            const supported = await BarcodeDetector.getSupportedFormats();
+
+            const preferred = [
+                "qr_code",
+                "code_128",
+                "code_39",
+                "code_93",
+                "ean_13",
+                "ean_8",
+                "itf",
+                "pdf417",
+                "data_matrix",
+                "aztec",
+                "upc_a",
+                "upc_e"
+            ];
+
+            const formats = preferred.filter(x => supported.includes(x));
+
+            if (formats.length) {
+                await scanBarcodeNative(formats);
+                return;
+            }
+
+        } catch (error) {
+            console.debug("Native barcode scanner unavailable:", error);
+        }
     }
 
+    // Multi-format fallback for iPhone/Safari and browsers without BarcodeDetector.
+    try {
+        await scanBarcodeWithZXing();
+    } catch (error) {
+        alert(
+            "تعذر تشغيل قارئ QR/Barcode.\n\n" +
+            (error?.message || "تأكد من السماح بالكاميرا والاتصال بالإنترنت.")
+        );
+    }
+}
+
+
+async function scanBarcodeNative(formats) {
+
+    const stream = await navigator.mediaDevices.getUserMedia({
+        video: {
+            facingMode: { ideal: "environment" },
+            width: { ideal: 1920 },
+            height: { ideal: 1080 }
+        }
+    });
+
+    const video = document.createElement("video");
+
+    Object.assign(video.style, {
+        position: "fixed",
+        inset: "0",
+        width: "100%",
+        height: "100%",
+        objectFit: "cover",
+        zIndex: "9999",
+        background: "#000"
+    });
+
+    video.autoplay = true;
+    video.playsInline = true;
+    video.muted = true;
+    video.srcObject = stream;
+
+    const hint = document.createElement("div");
+    hint.innerText = "وجّه الكاميرا إلى QR / Barcode — اضغط للرجوع";
+    Object.assign(hint.style, {
+        position: "fixed",
+        top: "20px",
+        left: "15px",
+        right: "15px",
+        zIndex: "10000",
+        color: "white",
+        background: "rgba(0,0,0,.65)",
+        padding: "12px",
+        borderRadius: "10px",
+        textAlign: "center",
+        fontWeight: "bold"
+    });
+
+    document.body.appendChild(video);
+    document.body.appendChild(hint);
+
+    const close = () => {
+        stream.getTracks().forEach(track => track.stop());
+        video.remove();
+        hint.remove();
+    };
+
+    hint.addEventListener("click", close);
+
+    await video.play().catch(() => {});
+
+    const detector = new BarcodeDetector({ formats });
+    let stopped = false;
+
+    const scan = async () => {
+
+        if (stopped) return;
+
+        try {
+            const codes = await detector.detect(video);
+
+            if (codes?.length) {
+                stopped = true;
+                const value = codes[0].rawValue || "";
+                close();
+                openParcelForm({ barcode: value });
+                return;
+            }
+        } catch (_) {}
+
+        requestAnimationFrame(scan);
+    };
+
+    scan();
+}
+
+
+async function loadZXing() {
+
+    if (window.ZXingBrowser) return window.ZXingBrowser;
+    if (zxingPromise) return zxingPromise;
+
+    zxingPromise = new Promise((resolve, reject) => {
+
+        const script = document.createElement("script");
+        script.src = "https://unpkg.com/@zxing/browser@0.2.1";
+        script.async = true;
+
+        script.onload = () => {
+            if (window.ZXingBrowser) resolve(window.ZXingBrowser);
+            else reject(new Error("لم يتم تحميل ZXing."));
+        };
+
+        script.onerror = () => reject(new Error("تعذر تحميل قارئ Barcode."));
+        document.head.appendChild(script);
+    });
+
+    return zxingPromise;
+}
+
+
+async function scanBarcodeWithZXing() {
+
+    const ZXing = await loadZXing();
+
+    const Reader = ZXing.BrowserMultiFormatReader;
+
+    if (!Reader) {
+        throw new Error("قارئ Barcode متعدد الصيغ غير متاح.");
+    }
+
+    const reader = new Reader();
+
+    const video = document.createElement("video");
+    Object.assign(video.style, {
+        position: "fixed",
+        inset: "0",
+        width: "100%",
+        height: "100%",
+        objectFit: "cover",
+        zIndex: "9999",
+        background: "#000"
+    });
+    video.autoplay = true;
+    video.playsInline = true;
+    video.muted = true;
+
+    const hint = document.createElement("div");
+    hint.innerText = "وجّه الكاميرا إلى QR / Barcode — اضغط هنا للإغلاق";
+    Object.assign(hint.style, {
+        position: "fixed",
+        top: "20px",
+        left: "15px",
+        right: "15px",
+        zIndex: "10000",
+        color: "white",
+        background: "rgba(0,0,0,.65)",
+        padding: "12px",
+        borderRadius: "10px",
+        textAlign: "center",
+        fontWeight: "bold"
+    });
+
+    document.body.appendChild(video);
+    document.body.appendChild(hint);
+
+    let controls = null;
+    let closed = false;
+
+    const close = () => {
+        if (closed) return;
+        closed = true;
+        try { controls?.stop?.(); } catch (_) {}
+        try { reader.reset?.(); } catch (_) {}
+        video.srcObject?.getTracks?.().forEach(track => track.stop());
+        video.remove();
+        hint.remove();
+    };
+
+    hint.addEventListener("click", close);
 
     try {
 
-        const stream =
-            await navigator
-                .mediaDevices
-                .getUserMedia({
-                    video: {
-                        facingMode:
-                            "environment"
-                    }
-                });
+        controls = await reader.decodeFromConstraints(
+            {
+                video: {
+                    facingMode: { ideal: "environment" },
+                    width: { ideal: 1920 },
+                    height: { ideal: 1080 }
+                }
+            },
+            video,
+            (result) => {
 
+                if (!result || closed) return;
 
-        const video =
-            document.createElement(
-                "video"
-            );
+                const value =
+                    result.getText?.() ||
+                    result.text ||
+                    "";
 
+                if (!value) return;
 
-        video.style.position =
-            "fixed";
-
-        video.style.inset =
-            "0";
-
-        video.style.width =
-            "100%";
-
-        video.style.height =
-            "100%";
-
-        video.style.objectFit =
-            "cover";
-
-        video.style.zIndex =
-            "9999";
-
-        video.autoplay =
-            true;
-
-        video.playsInline =
-            true;
-
-        document.body.appendChild(
-            video
+                close();
+                openParcelForm({ barcode: value });
+            }
         );
 
-
-        video.srcObject =
-            stream;
-
-
-        const detector =
-            new BarcodeDetector({
-                formats: [
-                    "qr_code",
-                    "code_128",
-                    "ean_13",
-                    "ean_8",
-                    "pdf417",
-                    "data_matrix",
-                    "aztec",
-                    "upc_a",
-                    "upc_e"
-                ]
-            });
-
-
-        const scan =
-            async () => {
-
-                try {
-
-                    const codes =
-                        await detector.detect(
-                            video
-                        );
-
-
-                    if (
-                        codes.length
-                    ) {
-
-                        const value =
-                            codes[0]
-                                .rawValue;
-
-
-                        stream
-                            .getTracks()
-                            .forEach(
-                                track =>
-                                    track.stop()
-                            );
-
-
-                        video.remove();
-
-
-                        openParcelForm({
-                            barcode:
-                                value
-                        });
-
-
-                        return;
-                    }
-
-                } catch {}
-
-
-                requestAnimationFrame(
-                    scan
-                );
-            };
-
-
-        scan();
-
-
-    } catch(error) {
-
-        alert(
-            "تعذر فتح الكاميرا: " +
-            error.message
-        );
+    } catch (error) {
+        close();
+        throw error;
     }
 }
 
@@ -2110,16 +2705,6 @@ function getAddress(
 }
 
 
-function getEl(id) {
-    return document.getElementById(id);
-}
-
-function setDisplay(id, value) {
-    const el = getEl(id);
-    if (el) el.style.display = value;
-    return el;
-}
-
 function updateUI() {
 
     const listEl =
@@ -2127,7 +2712,11 @@ function updateUI() {
             "parcelsList"
         );
 
-    if (!listEl) return;
+
+    const emptyMsg =
+        document.getElementById(
+            "emptyMsg"
+        );
 
 
     const total =
@@ -2191,15 +2780,25 @@ function updateUI() {
         " كم";
 
 
-    listEl.innerHTML = "";
+    listEl.innerHTML =
+        "";
+
 
     if (!total) {
-        const msg = document.createElement("p");
-        msg.className = "empty";
-        msg.textContent = "ما في طرود مضافة. ابدأ الإدخال!";
-        listEl.appendChild(msg);
+
+        listEl.appendChild(
+            emptyMsg
+        );
+
+        emptyMsg.style.display =
+            "block";
+
         return;
     }
+
+
+    emptyMsg.style.display =
+        "none";
 
 
     parcels.forEach(
@@ -2731,11 +3330,16 @@ function optimizeRoute() {
 
     if (!first) {
 
-        const nextStop = getEl("nextStop");
-        if (nextStop) {
-            nextStop.style.display = "block";
-            nextStop.innerHTML = "ℹ️ لتحسين المسار بدقة نحتاج إحداثيات الطرود. يمكن استخدام عنوان Google Maps لكل طرد.";
-        }
+        document.getElementById(
+            "nextStop"
+        ).style.display =
+            "block";
+
+
+        document.getElementById(
+            "nextStop"
+        ).innerHTML =
+            "ℹ️ لتحسين المسار بدقة نحتاج إحداثيات الطرود. يمكن استخدام عنوان Google Maps لكل طرد.";
 
         return;
     }
@@ -2750,10 +3354,15 @@ function optimizeRoute() {
         );
 
 
-    const nextStop = getEl("nextStop");
-    if (!nextStop) return;
-    nextStop.style.display = "block";
-    nextStop.innerHTML = `
+    document.getElementById(
+        "nextStop"
+    ).style.display =
+        "block";
+
+
+    document.getElementById(
+        "nextStop"
+    ).innerHTML = `
 
         <b>
             📍 أقرب طرد:
@@ -2784,8 +3393,16 @@ function optimizeRoute() {
    LOADING
 ===================================================== */
 
-function showLoading(show) {
-    setDisplay("loading", show ? "block" : "none");
+function showLoading(
+    show
+) {
+
+    document.getElementById(
+        "loading"
+    ).style.display =
+        show
+            ? "block"
+            : "none";
 }
 
 
@@ -2974,244 +3591,33 @@ window.addEventListener(
 updateConnection();
 
 
+    // Modern live clock/date.
+    (function initLiveClock() {
+        function updateLiveClock() {
+            const now = new Date();
+            const timeEl = document.getElementById("liveTime");
+            const dateEl = document.getElementById("liveDate");
 
-/* =====================================================
-   STABLE PARCEL VIEWS — DOES NOT TOUCH parcelsList
-   ===================================================== */
+            if (timeEl) {
+                timeEl.textContent = now.toLocaleTimeString("de-DE", {
+                    hour: "2-digit",
+                    minute: "2-digit",
+                    second: "2-digit"
+                });
+            }
 
-function parcelDate(parcel) {
-    return parcel.createdAt || parcel.deliveredAt || null;
-}
-
-function isParcelToday(parcel) {
-    const raw = parcelDate(parcel);
-    if (!raw) return false;
-    const d = new Date(raw);
-    if (Number.isNaN(d.getTime())) return false;
-    const n = new Date();
-    return d.getFullYear() === n.getFullYear() &&
-           d.getMonth() === n.getMonth() &&
-           d.getDate() === n.getDate();
-}
-
-function phoneForWhatsApp(phone) {
-    let p = String(phone || '').replace(/[^\d+]/g,'');
-    if (p.startsWith('00')) p = '+' + p.slice(2);
-    if (p.startsWith('0')) p = '+49' + p.slice(1);
-    return p.replace(/\D/g,'');
-}
-
-function parcelStatusHTML(parcel) {
-    if (parcel.status === 'delivered') return '<span class="status-badge status-delivered">✓ تم التسليم</span>';
-    if (parcel.status === 'absent') return '<span class="status-badge status-absent">✕ غياب</span>';
-    if (parcel.status === 'reattempt') return '<span class="status-badge status-reattempt">🔄 إعادة</span>';
-    return '<span class="status-badge">قيد الانتظار</span>';
-}
-
-function renderFilteredParcel(parcel, index) {
-    const address = getAddress(parcel);
-    const phone = parcel.phone || '';
-    const wa = phoneForWhatsApp(phone);
-    return `
-        <div class="filter-card">
-            <div class="parcel-info">
-                <span>📦 #${index + 1}${parcel.barcode ? ' · ' + escapeHTML(parcel.barcode) : ''}</span>
-                ${parcelStatusHTML(parcel)}
-            </div>
-            <div class="parcel-info">👤 ${escapeHTML(parcel.name || 'بدون اسم')}</div>
-            <div class="address-box">📍 ${escapeHTML(address)}</div>
-            ${parcel.routeOrder ? `<div class="route-mini">🔢 ترتيب المسار: ${parcel.routeOrder} · 📏 ${Number(parcel.routeDistanceKm || 0).toFixed(2)} كم</div>` : ''}
-            ${parcel.deliveredAt ? `<div class="parcel-fields">🕐 تم التسليم: ${new Date(parcel.deliveredAt).toLocaleString('de-DE')}</div>` : ''}
-            ${parcel.notes ? `<div class="parcel-fields">📝 ${escapeHTML(parcel.notes)}</div>` : ''}
-            <div class="btn-group">
-                <button class="action-btn map-btn" onclick="openParcelNavigation(${index})">🧭 ملاحة</button>
-                ${phone ? `<a class="action-btn wa-btn" target="_blank" href="https://wa.me/${wa}">💬 WhatsApp</a>` : ''}
-                ${phone ? `<a class="action-btn" style="background:#2563eb" href="tel:${escapeHTML(phone)}">📞 اتصال</a>` : ''}
-                ${parcel.status !== 'delivered' ? `<button class="action-btn deliver-btn" onclick="markDelivered(${index})">✅ تسليم</button>` : ''}
-                <button class="action-btn proof-btn" onclick="takeProof(${index})">📸 صورة</button>
-                <button class="action-btn" style="background:#9333ea" onclick="openSignature(${index})">✍️ توقيع</button>
-                <button class="action-btn edit-btn" onclick="editParcel(${index})">✏️ تعديل</button>
-            </div>
-            ${parcel.proofUrl ? `<div style="margin-top:6px"><b>📸 صورة التسليم</b><img class="proof-img" src="${escapeHTML(parcel.proofUrl)}"></div>` : ''}
-            ${parcel.signatureUrl ? `<div style="margin-top:6px"><b>✍️ توقيع المستلم</b><img class="proof-img" src="${escapeHTML(parcel.signatureUrl)}"></div>` : ''}
-            ${parcel.status === 'delivered' && phone ? `<button class="action-main-btn" style="background:#16a34a;margin-top:6px" onclick="sendDeliveryConfirmation(${index})">💬 تأكيد التسليم WhatsApp</button>` : ''}
-        </div>`;
-}
-
-function showParcelView(view) {
-    const box = document.getElementById('filteredParcelView');
-    if (!box) return;
-
-    const original = document.getElementById('parcelsList');
-    const originalCard = original ? original.closest('.card') : null;
-
-    // Keep the original "الطرود بالشنطة" list visible for ALL.
-    if (originalCard) originalCard.style.display = view === 'all' ? 'block' : 'none';
-
-    if (view === 'all') {
-        box.style.display = 'none';
-        return;
-    }
-
-    box.style.display = 'block';
-
-    let list = [];
-    if (view === 'today') {
-        list = parcels.filter(isParcelToday);
-    } else if (view === 'history') {
-        list = parcels.filter(p => p.status === 'delivered');
-    } else {
-        list = parcels.filter(p => p.status === 'pending' || p.status === 'reattempt');
-        list.sort((a,b) => Number(a.routeOrder || 999999) - Number(b.routeOrder || 999999));
-    }
-
-    const title = view === 'today' ? '📅 طرود اليوم' : view === 'history' ? '🕘 الطرود المستلمة' : '🚚 مسار التسليم';
-    box.innerHTML = `<div style="font-weight:bold;color:#38bdf8;margin-bottom:6px">${title} <span class="section-count">(${list.length})</span></div>` +
-        (list.length ? list.map(p => renderFilteredParcel(p, parcels.indexOf(p))).join('') : '<div class="empty">لا توجد طرود هنا.</div>');
-}
-
-function openParcelNavigation(index) {
-    const p = parcels[index];
-    const destination = Number.isFinite(Number(p.lat)) && Number.isFinite(Number(p.lon))
-        ? `${p.lat},${p.lon}`
-        : getAddress(p);
-    window.open('https://www.google.com/maps/dir/?api=1&destination=' + encodeURIComponent(destination), '_blank');
-}
-
-function sendDeliveryConfirmation(index) {
-    const p = parcels[index];
-    const wa = phoneForWhatsApp(p.phone);
-    if (!wa) return alert('لا يوجد رقم هاتف لهذا الطرد.');
-    const text = 'Hallo, Ihr Paket wurde erfolgreich zugestellt. Vielen Dank!';
-    window.open('https://wa.me/' + wa + '?text=' + encodeURIComponent(text), '_blank');
-}
-
-function openSignature(index) {
-    let modal = document.getElementById('signatureModal');
-    if (!modal) {
-        modal = document.createElement('div');
-        modal.id = 'signatureModal';
-        modal.className = 'modal show';
-        modal.innerHTML = `
-            <div class="modal-content">
-                <h3>✍️ توقيع المستلم</h3>
-                <canvas id="signatureCanvas" class="signature-canvas" width="900" height="400"></canvas>
-                <div class="modal-actions">
-                    <button class="modal-btn" onclick="saveSignature()">✅ حفظ</button>
-                    <button class="modal-btn close-btn" onclick="clearSignature()">🗑️ مسح</button>
-                </div>
-                <button class="modal-btn close-btn" style="width:100%;margin-top:6px" onclick="closeSignature()">إغلاق</button>
-            </div>`;
-        document.body.appendChild(modal);
-        setupSignatureCanvas();
-    }
-    modal.dataset.index = String(index);
-    modal.classList.add('show');
-    clearSignature();
-}
-
-function setupSignatureCanvas() {
-    const canvas = document.getElementById('signatureCanvas');
-    if (!canvas || canvas.dataset.ready) return;
-    canvas.dataset.ready = '1';
-    const ctx = canvas.getContext('2d');
-    ctx.lineWidth = 3; ctx.lineCap = 'round'; ctx.strokeStyle = '#111827';
-    let drawing = false;
-    const point = e => {
-        const r = canvas.getBoundingClientRect();
-        const q = e.touches ? e.touches[0] : e;
-        return {x:(q.clientX-r.left)*canvas.width/r.width, y:(q.clientY-r.top)*canvas.height/r.height};
-    };
-    const start = e => { drawing=true; const p=point(e); ctx.beginPath(); ctx.moveTo(p.x,p.y); e.preventDefault(); };
-    const move = e => { if(!drawing)return; const p=point(e); ctx.lineTo(p.x,p.y); ctx.stroke(); e.preventDefault(); };
-    const stop = () => drawing=false;
-    canvas.addEventListener('mousedown',start); canvas.addEventListener('mousemove',move); canvas.addEventListener('mouseup',stop); canvas.addEventListener('mouseleave',stop);
-    canvas.addEventListener('touchstart',start,{passive:false}); canvas.addEventListener('touchmove',move,{passive:false}); canvas.addEventListener('touchend',stop);
-}
-
-function clearSignature() {
-    const c=document.getElementById('signatureCanvas');
-    if(c) c.getContext('2d').clearRect(0,0,c.width,c.height);
-}
-
-function closeSignature() {
-    const m=document.getElementById('signatureModal');
-    if(m) m.classList.remove('show');
-}
-
-function saveSignature() {
-    const m=document.getElementById('signatureModal');
-    const c=document.getElementById('signatureCanvas');
-    if(!m || !c) return;
-    const index=Number(m.dataset.index);
-    const pixels=c.getContext('2d').getImageData(0,0,c.width,c.height).data;
-    let ink=false;
-    for(let i=3;i<pixels.length;i+=4){ if(pixels[i]>0){ink=true;break;} }
-    if(!ink) return alert('يرجى توقيع المستلم أولًا.');
-    parcels[index].signatureUrl=c.toDataURL('image/png');
-    parcels[index].signatureAt=new Date().toISOString();
-    saveAndSync();
-    closeSignature();
-}
-
-/* Preserve the original list: these additions only add filtered views. */
-const originalSaveParcelForm = window.saveParcelForm;
-
-async function geocodeForRoute(parcel) {
-    if (Number.isFinite(Number(parcel.lat)) && Number.isFinite(Number(parcel.lon))) return true;
-    const address = getAddress(parcel);
-    if (!address || address === 'عنوان غير مكتمل') return false;
-    try {
-        const r = await fetch(GEOCODE_BACKEND_URL + '?q=' + encodeURIComponent(address));
-        const d = await r.json();
-        if (!d.success || !Number.isFinite(Number(d.lat)) || !Number.isFinite(Number(d.lon))) return false;
-        parcel.lat=Number(d.lat); parcel.lon=Number(d.lon);
-        return true;
-    } catch(e) { return false; }
-}
-
-async function optimizeRouteSafe() {
-    // Make sure the main parcel list is rendered before route optimization
-    // triggers saveAndSync()/updateUI().
-    if (!document.getElementById("parcelsList")) {
-        showParcelView("all");
-    }
-
-    const candidates=parcels.filter(p=>p.status==='pending'||p.status==='reattempt');
-    if(!candidates.length) return alert('لا توجد طرود متبقية.');
-    if(lastLat===null||lastLon===null) return alert('اسمح للتطبيق بالوصول إلى موقعك أولًا.');
-    showLoading(true);
-    try {
-        for(let i=0;i<candidates.length;i++){
-            await geocodeForRoute(candidates[i]);
-            document.getElementById('loading').textContent=`📍 تحديد مواقع الطرود ${i+1}/${candidates.length}`;
-            if(i<candidates.length-1) await new Promise(r=>setTimeout(r,1100));
+            if (dateEl) {
+                dateEl.textContent = now.toLocaleDateString("ar-DE", {
+                    weekday: "long",
+                    day: "2-digit",
+                    month: "long",
+                    year: "numeric"
+                });
+            }
         }
-        const remaining=candidates.filter(p=>Number.isFinite(Number(p.lat))&&Number.isFinite(Number(p.lon)));
-        if(!remaining.length) throw new Error('لم يتم العثور على إحداثيات للطرود.');
-        const ordered=[]; let lat=Number(lastLat), lon=Number(lastLon);
-        while(remaining.length){
-            let bi=0, bd=Infinity;
-            remaining.forEach((p,i)=>{const d=calculateDistance(lat,lon,p.lat,p.lon);if(d<bd){bd=d;bi=i;}});
-            const p=remaining.splice(bi,1)[0];
-            p.routeOrder=ordered.length+1; p.routeDistanceKm=Number(bd.toFixed(2));
-            ordered.push(p); lat=p.lat; lon=p.lon;
-        }
-        saveAndSync();
-        showParcelView('route');
-        const n=ordered[0];
-        const next=document.getElementById('nextStop');
-        if(next){next.style.display='block';next.innerHTML=`<b>🚚 الطرد التالي</b><br>📍 ${escapeHTML(getAddress(n))}<br>📏 ${n.routeDistanceKm} كم<br><button class="action-btn map-btn" style="width:100%;margin-top:5px" onclick="openParcelNavigation(${parcels.indexOf(n)})">🧭 الملاحة</button>`;}
-    } catch(e){ alert(e.message||'تعذر ترتيب المسار.'); }
-    finally { setTimeout(()=>showLoading(false),700); }
-}
-
-// Initialize views after the original UI has rendered. The original list remains the source of truth.
-setTimeout(() => {
-    parcels.forEach(p => { if(!p.createdAt) p.createdAt = p.id ? new Date(Number(p.id)).toISOString() : new Date().toISOString(); });
-    localStorage.setItem('saved_parcels', JSON.stringify(parcels));
-    showParcelView('all');
-}, 0);
+        updateLiveClock();
+        setInterval(updateLiveClock, 1000);
+    })();
 
 </script>
 
