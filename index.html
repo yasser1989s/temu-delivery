@@ -1234,7 +1234,7 @@ async function analyzeBatchImage(file) {
                 mimeType: file.type || "image/jpeg",
                 prompt: `
 حلل صورة تحتوي على ملصق واحد أو عدة ملصقات طرود.
-استخرج جميع الطرود الظاهرة في الصورة. لا تتوقف عند أول طرد.
+استخرج جميع الطرود الظاهرة في الصورة، وليس أول طرد فقط.
 أعد JSON فقط بهذا الشكل:
 {
   "packages": [
@@ -1251,26 +1251,159 @@ async function analyzeBatchImage(file) {
     }
   ]
 }
+إذا كانت الصورة تحتوي على طرد واحد، يجب أن يكون packages مصفوفة تحتوي على طرد واحد.
 لا تخمن البيانات. إذا لم تكن قيمة واضحة اتركها فارغة.
                 `.trim()
             })
         }
     );
 
-    const data = await response.json();
+    let data = {};
+    const rawText = await response.text();
+
+    try {
+        data = rawText ? JSON.parse(rawText) : {};
+    } catch (e) {
+        throw new Error("استجابة الـAI ليست JSON صحيحة.");
+    }
 
     if (!response.ok || !data.success) {
-        throw new Error(data.error || "فشل تحليل صورة الدفعة");
+        throw new Error(
+            data.error ||
+            data.message ||
+            `فشل تحليل الصورة (HTTP ${response.status})`
+        );
     }
 
-    let packages = data.data?.packages || data.data?.parcels || data.packages || [];
+    /*
+      The Worker can return the AI result in several valid shapes.
+      Accept all of them so batch import does not silently become 0/0.
+    */
+    let packages = [];
 
-    // If the model returned one parcel object instead of an array, accept it.
-    if (!Array.isArray(packages) && data.data && typeof data.data === "object") {
-        packages = [data.data];
+    const candidates = [
+        data?.data?.packages,
+        data?.data?.parcels,
+        data?.packages,
+        data?.parcels,
+        data?.result?.packages,
+        data?.result?.parcels
+    ];
+
+    for (const candidate of candidates) {
+        if (Array.isArray(candidate)) {
+            packages = candidate;
+            break;
+        }
     }
 
-    return Array.isArray(packages) ? packages : [];
+    // data.data itself may already be an array.
+    if (!packages.length && Array.isArray(data?.data)) {
+        packages = data.data;
+    }
+
+    // The AI may return one parcel object instead of packages[].
+    if (
+        !packages.length &&
+        data?.data &&
+        typeof data.data === "object" &&
+        !Array.isArray(data.data)
+    ) {
+        const one = data.data;
+
+        if (
+            one.address ||
+            one.fullAddress ||
+            one.street ||
+            one.houseNumber ||
+            one.postalCode ||
+            one.city ||
+            one.recipientName ||
+            one.name ||
+            one.trackingNumber ||
+            one.barcode
+        ) {
+            packages = [one];
+        }
+    }
+
+    // Some Worker versions return the AI JSON as text.
+    const textCandidates = [
+        data?.text,
+        data?.data?.text,
+        data?.rawText
+    ].filter(v => typeof v === "string" && v.trim());
+
+    if (!packages.length && textCandidates.length) {
+        for (const text of textCandidates) {
+            try {
+                const clean = text
+                    .replace(/```json/gi, "")
+                    .replace(/```/g, "")
+                    .trim();
+
+                let parsed = null;
+
+                try {
+                    parsed = JSON.parse(clean);
+                } catch {
+                    const a = clean.indexOf("{");
+                    const b = clean.lastIndexOf("}");
+                    if (a >= 0 && b > a) {
+                        parsed = JSON.parse(clean.slice(a, b + 1));
+                    }
+                }
+
+                if (Array.isArray(parsed)) {
+                    packages = parsed;
+                    break;
+                }
+
+                if (parsed?.packages && Array.isArray(parsed.packages)) {
+                    packages = parsed.packages;
+                    break;
+                }
+
+                if (parsed?.parcels && Array.isArray(parsed.parcels)) {
+                    packages = parsed.parcels;
+                    break;
+                }
+
+                if (
+                    parsed &&
+                    typeof parsed === "object" &&
+                    (
+                        parsed.address ||
+                        parsed.street ||
+                        parsed.city ||
+                        parsed.name ||
+                        parsed.recipientName
+                    )
+                ) {
+                    packages = [parsed];
+                    break;
+                }
+            } catch {
+                // Try the next possible text field.
+            }
+        }
+    }
+
+    /*
+      Never silently return 0 when the Worker actually returned a
+      successful AI response. Throw a useful error instead so the user
+      knows exactly which image failed.
+    */
+    if (!packages.length) {
+        console.error("Batch AI returned no parcels:", data);
+
+        throw new Error(
+            "الـAI أنهى تحليل الصورة لكنه لم يرجع أي طرود. " +
+            "تحقق من استجابة Worker /analyze-image."
+        );
+    }
+
+    return packages;
 }
 
 function parcelDedupKey(p) {
@@ -1303,29 +1436,40 @@ async function importAllParcelsBatch(files) {
         const existingKeys = new Set(parcels.map(parcelDedupKey));
         const added = [];
         const seen = new Set();
+        let invalid = 0;
+        let duplicates = 0;
 
         for (const item of detected) {
             const p = normalizeBatchParcel(item);
-            if (!p) continue;
+
+            if (!p) {
+                invalid++;
+                continue;
+            }
 
             const key = parcelDedupKey(p);
-            if (!key || seen.has(key) || existingKeys.has(key)) continue;
+
+            if (!key || seen.has(key) || existingKeys.has(key)) {
+                duplicates++;
+                continue;
+            }
 
             seen.add(key);
             added.push(p);
         }
 
-        parcels.push(...added);
-        saveAndSync();
+        if (added.length) {
+            parcels.push(...added);
+            saveAndSync();
+        }
 
         // Show the normal parcel list immediately.
         showParcelView("all");
 
         alert(
             `تمت إضافة ${added.length} طرد من أصل ${detected.length} طرد مقروء.` +
-            (detected.length !== added.length
-                ? "\nتم تجاهل المكرر أو البيانات غير الكافية."
-                : "")
+            `\nالمكرر: ${duplicates}` +
+            `\nالبيانات غير الكافية: ${invalid}`
         );
 
     } catch (error) {
