@@ -3046,6 +3046,26 @@ window.addEventListener(
 
 updateConnection();
 
+
+/* Make the parcel-history controls available to inline onclick handlers. */
+window.showParcelView = showParcelView;
+window.closeParcelView = closeParcelView;
+window.showParcelDetails = showParcelDetails;
+window.closeParcelDetails = closeParcelDetails;
+window.openSignatureModal = openSignatureModal;
+window.closeSignatureModal = closeSignatureModal;
+
+
+document.addEventListener("DOMContentLoaded", function () {
+    const historyBtn = document.querySelector('[onclick="showParcelView(\'history\')"]');
+    const todayBtn = document.querySelector('[onclick="showParcelView(\'today\')"]');
+    const allBtn = document.querySelector('[onclick="showParcelView(\'all\')"]');
+
+    if (historyBtn) historyBtn.onclick = function () { window.showParcelView("history"); };
+    if (todayBtn) todayBtn.onclick = function () { window.showParcelView("today"); };
+    if (allBtn) allBtn.onclick = function () { window.showParcelView("all"); };
+});
+
 </script>
 
 </body>
