@@ -410,6 +410,35 @@
         .route-mini { background:#172554; border:1px solid #2563eb; padding:6px; border-radius:6px; margin:5px 0; }
         .filter-card { background:#334155; border:1px solid #475569; padding:8px; border-radius:7px; margin-bottom:7px; }
     </style>
+
+<style id="batch-camera-style">
+#batchCameraModal{
+  position:fixed;inset:0;background:rgba(0,0,0,.92);z-index:99999;
+  display:none;align-items:center;justify-content:center;padding:14px;
+}
+#batchCameraModal.show{display:flex}
+.batch-camera-box{
+  width:min(520px,100%);max-height:96vh;overflow:auto;background:#0f172a;
+  border:1px solid #334155;border-radius:18px;padding:14px;color:#fff;
+}
+#batchCameraVideo{
+  width:100%;display:block;background:#000;border-radius:14px;
+  aspect-ratio:3/4;object-fit:cover;
+}
+.batch-camera-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}
+.batch-camera-actions button{
+  border:0;border-radius:12px;padding:13px;font-weight:800;font-size:14px;cursor:pointer;
+}
+#batchCaptureBtn{background:#10b981;color:#fff}
+#batchFinishBtn{background:#0ea5e9;color:#fff}
+#batchCameraCloseBtn{background:#334155;color:#fff}
+#batchGalleryBtn{background:#7c3aed;color:#fff}
+#batchPhotoCount{text-align:center;color:#cbd5e1;margin:8px 0;font-size:13px}
+#batchThumbs{display:flex;gap:6px;overflow-x:auto;padding:4px 0}
+#batchThumbs img{width:58px;height:76px;object-fit:cover;border-radius:7px;border:1px solid #475569;flex:none}
+#batchCameraStatus{text-align:center;color:#93c5fd;min-height:20px;margin-top:7px;font-size:12px}
+</style>
+
 </head>
 
 
@@ -1308,18 +1337,239 @@ async function importAllParcelsBatch(files) {
     }
 }
 
+
+let batchCameraStream = null;
+let batchCapturedFiles = [];
+
+function updateBatchCameraUI() {
+    const count = document.getElementById("batchPhotoCount");
+    const thumbs = document.getElementById("batchThumbs");
+    if (count) count.textContent = `تم التقاط ${batchCapturedFiles.length} صورة`;
+
+    if (thumbs) {
+        thumbs.innerHTML = "";
+        batchCapturedFiles.forEach(file => {
+            const img = document.createElement("img");
+            img.src = URL.createObjectURL(file);
+            thumbs.appendChild(img);
+        });
+    }
+}
+
+function stopBatchCamera() {
+    if (batchCameraStream) {
+        batchCameraStream.getTracks().forEach(track => track.stop());
+        batchCameraStream = null;
+    }
+    const video = document.getElementById("batchCameraVideo");
+    if (video) video.srcObject = null;
+}
+
+async function openBatchCamera() {
+    const modal = document.getElementById("batchCameraModal");
+    const video = document.getElementById("batchCameraVideo");
+    const status = document.getElementById("batchCameraStatus");
+
+    if (!modal || !video) return;
+
+    batchCapturedFiles = [];
+    updateBatchCameraUI();
+    modal.classList.add("show");
+    modal.setAttribute("aria-hidden", "false");
+
+    try {
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+            throw new Error("الكاميرا المباشرة غير مدعومة في هذا المتصفح.");
+        }
+
+        batchCameraStream = await navigator.mediaDevices.getUserMedia({
+            video: {
+                facingMode: { ideal: "environment" },
+                width: { ideal: 1920 },
+                height: { ideal: 1080 }
+            },
+            audio: false
+        });
+
+        video.srcObject = batchCameraStream;
+        await video.play();
+
+        if (status) {
+            status.textContent = "الكاميرا جاهزة — صوّر كل طرد ثم اضغط إنهاء وتحليل.";
+        }
+
+    } catch (error) {
+        console.error(error);
+
+        if (status) {
+            status.textContent =
+                "تعذر فتح الكاميرا مباشرة. يمكنك اختيار الصور من الجهاز.";
+        }
+    }
+}
+
+function closeBatchCamera() {
+    stopBatchCamera();
+
+    const modal = document.getElementById("batchCameraModal");
+    if (modal) {
+        modal.classList.remove("show");
+        modal.setAttribute("aria-hidden", "true");
+    }
+}
+
+async function captureBatchParcelPhoto() {
+    const video = document.getElementById("batchCameraVideo");
+    const status = document.getElementById("batchCameraStatus");
+
+    if (!video || !video.videoWidth || !video.videoHeight) {
+        alert("الكاميرا لم تصبح جاهزة بعد.");
+        return;
+    }
+
+    const canvas = document.createElement("canvas");
+
+    // Keep the image large enough for address recognition but avoid enormous uploads.
+    const maxWidth = 1600;
+    const scale = Math.min(1, maxWidth / video.videoWidth);
+
+    canvas.width = Math.round(video.videoWidth * scale);
+    canvas.height = Math.round(video.videoHeight * scale);
+
+    const ctx = canvas.getContext("2d", { alpha: false });
+
+    ctx.drawImage(
+        video,
+        0,
+        0,
+        canvas.width,
+        canvas.height
+    );
+
+    const blob = await new Promise(resolve =>
+        canvas.toBlob(resolve, "image/jpeg", 0.88)
+    );
+
+    if (!blob) {
+        alert("تعذر حفظ الصورة.");
+        return;
+    }
+
+    const file = new File(
+        [blob],
+        `parcel-${Date.now()}-${batchCapturedFiles.length + 1}.jpg`,
+        { type: "image/jpeg" }
+    );
+
+    batchCapturedFiles.push(file);
+    updateBatchCameraUI();
+
+    if (status) {
+        status.textContent =
+            `تم تصوير الطرد ${batchCapturedFiles.length}. يمكنك تصوير الطرد التالي.`;
+    }
+}
+
+async function finishBatchCamera() {
+    if (!batchCapturedFiles.length) {
+        alert("لم يتم تصوير أي طرد.");
+        return;
+    }
+
+    const files = [...batchCapturedFiles];
+
+    closeBatchCamera();
+
+    await importAllParcelsBatch(files);
+}
+
 function initBatchImport() {
     const button = document.getElementById("batchImportBtn");
-    const input = document.getElementById("batchImportInput");
-    if (!button || !input) return;
+    const galleryInput = document.getElementById("batchGalleryInput");
 
-    button.addEventListener("click", () => input.click());
+    if (!button) return;
 
-    input.addEventListener("change", async event => {
-        const files = Array.from(event.target.files || []);
-        event.target.value = "";
-        await importAllParcelsBatch(files);
-    });
+    // Main button opens the continuous camera.
+    button.addEventListener("click", openBatchCamera);
+
+    const captureBtn =
+        document.getElementById("batchCaptureBtn");
+
+    const finishBtn =
+        document.getElementById("batchFinishBtn");
+
+    const closeBtn =
+        document.getElementById("batchCameraCloseBtn");
+
+    const galleryBtn =
+        document.getElementById("batchGalleryBtn");
+
+    if (captureBtn) {
+        captureBtn.addEventListener(
+            "click",
+            captureBatchParcelPhoto
+        );
+    }
+
+    if (finishBtn) {
+        finishBtn.addEventListener(
+            "click",
+            finishBatchCamera
+        );
+    }
+
+    if (closeBtn) {
+        closeBtn.addEventListener(
+            "click",
+            closeBatchCamera
+        );
+    }
+
+    if (galleryBtn && galleryInput) {
+        galleryBtn.addEventListener(
+            "click",
+            () => galleryInput.click()
+        );
+
+        galleryInput.addEventListener(
+            "change",
+            async event => {
+                const files =
+                    Array.from(
+                        event.target.files || []
+                    );
+
+                event.target.value = "";
+
+                if (!files.length) return;
+
+                closeBatchCamera();
+                await importAllParcelsBatch(files);
+            }
+        );
+    }
+
+    // Keep the old hidden batch input as a fallback if it exists.
+    const oldInput =
+        document.getElementById("batchImportInput");
+
+    if (oldInput) {
+        oldInput.addEventListener(
+            "change",
+            async event => {
+                const files =
+                    Array.from(
+                        event.target.files || []
+                    );
+
+                event.target.value = "";
+
+                if (files.length) {
+                    await importAllParcelsBatch(files);
+                }
+            }
+        );
+    }
 }
 
 initBatchImport();
@@ -3486,6 +3736,28 @@ if (!window.__parcelActionHandlerInstalled) {
 }
 
 </script>
+
+
+<!-- Batch AI Camera -->
+<div id="batchCameraModal" aria-hidden="true">
+  <div class="batch-camera-box">
+    <h3 style="margin:4px 0 8px;text-align:center">📦📷 تصوير كل الطرود</h3>
+    <div style="text-align:center;color:#cbd5e1;font-size:12px">
+      صوّر الطرود واحدًا بعد الآخر بدون الرجوع للواجهة. عند الانتهاء اضغط «إنهاء وتحليل».
+    </div>
+    <video id="batchCameraVideo" autoplay playsinline muted></video>
+    <div id="batchPhotoCount">تم التقاط 0 صورة</div>
+    <div id="batchThumbs"></div>
+    <div id="batchCameraStatus"></div>
+    <div class="batch-camera-actions">
+      <button id="batchCaptureBtn">📸 تصوير الطرد</button>
+      <button id="batchFinishBtn">🤖 إنهاء وتحليل الكل</button>
+      <button id="batchGalleryBtn">🖼️ اختيار صور من الجهاز</button>
+      <button id="batchCameraCloseBtn">✕ إغلاق</button>
+    </div>
+    <input id="batchGalleryInput" type="file" accept="image/*" multiple hidden>
+  </div>
+</div>
 
 </body>
 </html>
